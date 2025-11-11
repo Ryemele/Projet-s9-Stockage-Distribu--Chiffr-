@@ -1,12 +1,10 @@
-version: "3.9"
-
 
 services:
   # ===== MINIO CLUSTER (distributed, 4 nodes) =====
   minio1:
     image: minio/minio:latest
     container_name: minio1
-    command: server --console-address ":9001" http://minio{1..4}/data
+    command: server --console-address ":9001" http://minio{1...4}/data
     environment:
       - MINIO_ROOT_USER=${MINIO_ROOT_USER}
       - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
@@ -20,7 +18,7 @@ services:
   minio2:
     image: minio/minio:latest
     container_name: minio2
-    command: server --console-address ":9001" http://minio{1..4}/data
+    command: server --console-address ":9001" http://minio{1...4}/data
     environment:
       - MINIO_ROOT_USER=${MINIO_ROOT_USER}
       - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
@@ -32,7 +30,7 @@ services:
   minio3:
     image: minio/minio:latest
     container_name: minio3
-    command: server --console-address ":9001" http://minio{1..4}/data
+    command: server --console-address ":9001" http://minio{1...4}/data
     environment:
       - MINIO_ROOT_USER=${MINIO_ROOT_USER}
       - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
@@ -43,7 +41,7 @@ services:
   minio4:
     image: minio/minio:latest
     container_name: minio4
-    command: server --console-address ":9001" http://minio{1..4}/data
+    command: server --console-address ":9001" http://minio{1...4}/data
     environment:
       - MINIO_ROOT_USER=${MINIO_ROOT_USER}
       - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}

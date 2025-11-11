@@ -17,6 +17,8 @@ S3_ACCESS_KEY = os.getenv("S3_ACCESS_KEY")
 S3_SECRET_KEY = os.getenv("S3_SECRET_KEY")
 DATABASE_URL = os.getenv("DATABASE_URL")
 
+if not all([S3_ACCESS_KEY, S3_SECRET_KEY, DATABASE_URL]):
+    raise RuntimeError("Missing env vars: S3_ACCESS_KEY / S3_SECRET_KEY / DATABASE_URL")
 
 s3 = boto3.client(
     "s3",
