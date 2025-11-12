@@ -77,19 +77,17 @@ def commit(req: CommitReq):
             size = head.get("ContentLength", 0)
             cx.execute(
                 text(
-                    "INSERT INTO chunks(file_id, offset, size_bytes, sha256, etag, s3_key) "
-                    "VALUES (:f, :o, :sz, :h, :e, :k) "
-                    "ON CONFLICT (file_id, offset) DO NOTHING"
-                ),
-                {"f": req.file_id, "o": offset, "sz": size, "h": h, "e": etag, "k": s3_key},
-            )
+                   "INSERT INTO chunks(file_id, chunk_index, size_bytes, sha256, etag, s3_key) "
+                    "VALUES (:f, :i, :sz, :h, :e, :k) ON CONFLICT (file_id, chunk_index) DO NOTHING"),
+                 {"f": req.file_id, "i": offset, "sz": size, "h": h, "e": etag, "k": s3_key}
+                 )
     return {"status": "ok"}
 
 @app.get("/download/{file_id}")
 def list_download(file_id: str):
     with db.begin() as cx:
         rows = cx.execute(
-            text("SELECT offset, sha256, s3_key FROM chunks WHERE file_id=:f ORDER BY offset ASC"),
+            text("SELECT chunk_index, sha256, s3_key FROM chunks WHERE file_id=:f ORDER BY chunk_index ASC"),
             {"f": file_id},
         ).mappings().all()
     parts = []
@@ -99,5 +97,5 @@ def list_download(file_id: str):
             Params={"Bucket": S3_BUCKET, "Key": r["s3_key"]},
             ExpiresIn=900,
         )
-        parts.append({"offset": r["offset"], "sha256": r["sha256"], "url": url})
+        parts.append({"offset": r["chunk_index"], "sha256": r["sha256"], "url": url})
     return {"parts": parts}
