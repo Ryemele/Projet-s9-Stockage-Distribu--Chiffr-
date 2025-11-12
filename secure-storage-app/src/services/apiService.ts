@@ -82,6 +82,7 @@ class ApiService {
 
   // ==================== File APIs ====================
 
+  // Overload signatures
   async uploadFile(
     encryptedData: Blob,
     metadata: {
@@ -91,13 +92,61 @@ class ApiService {
       iv: string;
       salt: string;
     }
+  ): Promise<EncryptedFile>;
+  async uploadFile(afghEnvelope: any): Promise<EncryptedFile>;
+
+  // Implementation
+  async uploadFile(
+    dataOrEnvelope: Blob | any,
+    metadata?: {
+      name: string;
+      size: number;
+      mimeType: string;
+      iv: string;
+      salt: string;
+    }
   ): Promise<EncryptedFile> {
+    // AFGH envelope format (single parameter)
+    if (!metadata && typeof dataOrEnvelope === 'object' && 'fileId' in dataOrEnvelope) {
+      if (this.USE_MOCK) {
+        // Mock: Save AFGH envelope to localStorage
+        const user = JSON.parse(localStorage.getItem("currentUser") || "{}");
+        const files = JSON.parse(localStorage.getItem("mockFiles") || "[]");
+
+        const newFile: EncryptedFile = {
+          id: dataOrEnvelope.fileId,
+          name: dataOrEnvelope.fileName,
+          size: dataOrEnvelope.fileSize,
+          mimeType: dataOrEnvelope.mimeType,
+          uploadedAt: new Date().toISOString(),
+          userId: user.id,
+          encryptedDataUrl: JSON.stringify(dataOrEnvelope), // Store the entire envelope
+          iv: Array.from(dataOrEnvelope.wrapKeyIV).map((b: number) => b.toString(16).padStart(2, '0')).join(''),
+          salt: dataOrEnvelope.kdfSalt ? Array.from(dataOrEnvelope.kdfSalt).map((b: number) => b.toString(16).padStart(2, '0')).join('') : ''
+        };
+
+        files.push(newFile);
+        localStorage.setItem("mockFiles", JSON.stringify(files));
+        console.log('[API Mock] File saved to localStorage:', newFile.id);
+
+        return newFile;
+      }
+
+      // Real API call for AFGH
+      const response = await this.api.post<EncryptedFile>(
+        "/files/upload",
+        dataOrEnvelope
+      );
+      return response.data;
+    }
+
+    // Old format (Blob + metadata)
     if (this.USE_MOCK) {
-      return this.mockUploadFile(encryptedData, metadata);
+      return this.mockUploadFile(dataOrEnvelope as Blob, metadata!);
     }
 
     const formData = new FormData();
-    formData.append("file", encryptedData);
+    formData.append("file", dataOrEnvelope as Blob);
     formData.append("metadata", JSON.stringify(metadata));
 
     const response = await this.api.post<EncryptedFile>(

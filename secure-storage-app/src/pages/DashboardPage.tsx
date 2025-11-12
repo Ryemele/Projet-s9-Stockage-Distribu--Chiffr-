@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FileUpload } from '../components/files/FileUpload';
+import { FileUploadEnhanced } from '../components/files/FileUploadEnhanced';
 import { FileList } from '../components/files/FileList';
 import { Card } from '../components/ui';
 import { Upload, Files } from 'lucide-react';
@@ -14,44 +14,45 @@ export const DashboardPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">My Files</h1>
-        <p className="text-gray-600 mt-1">
-          Manage your encrypted files securely
+    <div className="space-y-8">
+      {/* Header */}
+      <div className="glass-card">
+        <h1 className="text-3xl font-bold gradient-text">My Files</h1>
+        <p className="text-gray-600 mt-2 text-lg">
+          Manage your encrypted files with AFGH proxy re-encryption
         </p>
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200">
-        <nav className="-mb-px flex space-x-8">
+      <div className="glass-card p-0 overflow-hidden">
+        <nav className="flex">
           <button
             onClick={() => setActiveTab('files')}
             className={`
-              py-4 px-1 border-b-2 font-medium text-sm transition-colors
+              flex-1 py-4 px-6 font-medium text-sm transition-all duration-200 flex items-center justify-center gap-2
               ${
                 activeTab === 'files'
-                  ? 'border-primary-600 text-primary-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg'
+                  : 'text-gray-600 hover:bg-gray-50'
               }
             `}
           >
-            <Files className="inline-block h-5 w-5 mr-2" />
-            My Files
+            <Files className="h-5 w-5" />
+            <span>My Files</span>
           </button>
           <button
             onClick={() => setActiveTab('upload')}
             className={`
-              py-4 px-1 border-b-2 font-medium text-sm transition-colors
+              flex-1 py-4 px-6 font-medium text-sm transition-all duration-200 flex items-center justify-center gap-2
               ${
                 activeTab === 'upload'
-                  ? 'border-primary-600 text-primary-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg'
+                  : 'text-gray-600 hover:bg-gray-50'
               }
             `}
           >
-            <Upload className="inline-block h-5 w-5 mr-2" />
-            Upload
+            <Upload className="h-5 w-5" />
+            <span>Upload</span>
           </button>
         </nav>
       </div>
@@ -59,7 +60,7 @@ export const DashboardPage: React.FC = () => {
       {/* Content */}
       <Card>
         {activeTab === 'upload' ? (
-          <FileUpload onUploadComplete={handleUploadComplete} />
+          <FileUploadEnhanced onUploadComplete={handleUploadComplete} />
         ) : (
           <FileList key={refreshKey} />
         )}
