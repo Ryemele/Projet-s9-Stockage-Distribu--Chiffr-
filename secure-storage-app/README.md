@@ -1,31 +1,55 @@
-# Secure Storage - End-to-End Encrypted File Storage
+# Secure Storage - AFGH Proxy Re-Encryption
 
-A modern, secure file storage application with client-side encryption built with React, TypeScript, and Web Crypto API.
+A modern, secure file storage application with **AFGH Proxy Re-Encryption** built with React, TypeScript, and Web Crypto API.
 
-## Features
+## 🔐 Features
 
-- **End-to-End Encryption**: All files are encrypted on your device before upload using AES-256-GCM
-- **Zero-Knowledge Architecture**: Your encryption keys never leave your device in plaintext
-- **Secure File Sharing**: Share files securely using RSA-OAEP asymmetric encryption
-- **Modern UI**: Beautiful, responsive interface built with Tailwind CSS
-- **Type-Safe**: Built with TypeScript for enhanced code quality and developer experience
+- **🎯 AFGH Proxy Re-Encryption**: Advanced unidirectional, non-transitive, collusion-safe proxy re-encryption
+- **🔒 End-to-End Encryption**: All files are encrypted on your device using hybrid KEM-DEM approach
+- **🔑 Zero-Knowledge Architecture**: Your encryption keys never leave your device in plaintext
+- **🤝 Secure File Sharing**: Share files without revealing your private key using proxy re-encryption
+- **🎨 Modern UI**: Professional glass morphism design with elegant animations
+- **✅ Type-Safe**: Built with TypeScript for enhanced code quality
 
-## Security Architecture
+## 🏗️ Security Architecture
 
-### Client-Side Encryption
+### AFGH Proxy Re-Encryption
 
-All encryption/decryption happens in your browser:
+This application implements the **Ateniese-Fu-Green-Hohenberger (AFGH)** proxy re-encryption scheme, a state-of-the-art cryptographic protocol.
 
-1. **Key Derivation**: Your password is used to derive an AES-256 key using PBKDF2 (100,000 iterations)
-2. **File Encryption**: Each file is encrypted with AES-256-GCM before upload
-3. **Secure Storage**: Encrypted files are stored on the server; only you can decrypt them
+**Key Properties:**
+- ✅ **Unidirectional**: Alice can share files with Bob without Bob being able to share back
+- ✅ **Non-transitive**: Proxy cannot re-delegate without Alice's permission
+- ✅ **Collusion-safe**: Proxy and Bob cannot recover Alice's private key
+- ✅ **CCA-secure**: Secure against chosen-ciphertext attacks
 
-### Technologies
+### Hybrid Encryption (KEM-DEM)
 
-- **Web Crypto API**: Native browser cryptography for maximum security
-- **AES-256-GCM**: Authenticated encryption with 256-bit keys
-- **RSA-OAEP**: 2048-bit asymmetric encryption for secure sharing
-- **PBKDF2**: Key derivation with SHA-256 and 100,000 iterations
+Files are encrypted using a hybrid approach for optimal performance and security:
+
+**KEM (Key Encapsulation Mechanism) - AFGH:**
+1. Generate random secret S in G2 (BLS12-381 curve)
+2. Encrypt S with AFGH Level 2 → (U, V) using owner's public key
+3. Derive symmetric key K_sym from S using PBKDF2
+
+**DEM (Data Encapsulation Mechanism) - AES-GCM:**
+1. Generate random file key K_file (AES-256)
+2. Wrap K_file with K_sym using AES-KW
+3. Encrypt file chunks with K_file using AES-256-GCM
+
+**Why Hybrid?**
+- 🚀 **Performance**: AES-GCM is hardware-accelerated and very fast
+- 🔐 **Security**: Combines AFGH's re-encryption capabilities with AES's proven security
+- 💪 **Flexibility**: AFGH only encrypts a small secret, not the entire file
+
+### Cryptographic Technologies
+
+- **BLS12-381**: Pairing-friendly elliptic curve for AFGH
+- **@noble/curves**: Secure, audited elliptic curve library
+- **AES-256-GCM**: Authenticated encryption for file data
+- **AES-KW**: Key wrapping for secure key storage
+- **PBKDF2**: Key derivation with 100,000 iterations
+- **Web Crypto API**: Native browser cryptography
 
 ## Getting Started
 
@@ -56,40 +80,74 @@ cp .env.example .env
 npm run dev
 ```
 
-5. Open [http://localhost:5173](http://localhost:5173) in your browser
+5. Open [http://localhost:5174](http://localhost:5174) in your browser
+
+## 🧪 Testing
+
+### Quick Test (5 minutes)
+
+See **[QUICK_TEST.md](./QUICK_TEST.md)** for a rapid walkthrough of key features.
+
+### Complete Test Suite
+
+See **[TEST_GUIDE.md](./TEST_GUIDE.md)** for comprehensive testing instructions including:
+- Registration & key generation
+- File upload & encryption
+- File download & decryption
+- File sharing with proxy re-encryption
+- Security tests
+
+### Test Files Available
+
+- `test-sample.txt` - Sample text file for testing
+- `test-upload-flow.html` - Interactive test page
+- `TEST_SUMMARY.md` - Complete testing overview
 
 ## Usage
 
 ### 1. Create an Account
 
 - Click "Sign Up" and create an account
-- **Important**: Your password is used to generate your encryption keys
+- **Important**: Your password is used to derive your AFGH key pair
 - Use a strong password and remember it - it cannot be recovered!
+- AFGH keys (G1 points) are automatically generated and stored securely
 
 ### 2. Upload Files
 
 - Navigate to the "Upload" tab
-- Select one or more files
-- Files are automatically encrypted before upload
+- Select a file to upload
+- Watch the encryption process:
+  - **Phase 1**: Generate random secret S (G2 element)
+  - **Phase 2**: Encrypt S with AFGH Level 2
+  - **Phase 3**: Encrypt file with AES-256-GCM
 - Monitor upload progress with the progress bar
+- Files are automatically encrypted before upload
 
 ### 3. Download Files
 
 - View your files in the "My Files" tab
 - Click the download icon to decrypt and download a file
+- Decryption process:
+  - **Level 2 Decryption**: Recover secret S using your private key
+  - **Unwrap**: Recover file key from wrapped key
+  - **Decrypt**: Decrypt chunks with AES-256-GCM
 - Files are decrypted in your browser
 
-### 4. Share Files
+### 4. Share Files (Proxy Re-Encryption)
 
 - Click the share icon next to any file
 - Enter the recipient's email address
-- The file encryption key is encrypted with the recipient's public key
+- **Magic happens**:
+  - A re-encryption key `rk = g^(b2/a2)` is generated
+  - Proxy can transform your ciphertext for Bob
+  - Bob can decrypt without your private key
 - Only the recipient can decrypt the shared file
+- **Security**: Proxy + Bob cannot recover your private key
 
 ### 5. Manage Account
 
 - Click on your name in the top right
-- View account details and security information
+- View account details and AFGH key information
 - Manage your profile settings
 
 ## Project Structure
@@ -97,18 +155,31 @@ npm run dev
 ```
 src/
 ├── components/
-│   ├── auth/           # Authentication components
-│   ├── files/          # File management components
-│   ├── layout/         # Layout and navigation
-│   └── ui/             # Reusable UI components
-├── contexts/           # React contexts (Auth)
-├── pages/              # Page components
-├── services/           # Business logic
-│   ├── apiService.ts   # API communication
-│   └── cryptoService.ts # Encryption/decryption
-├── types/              # TypeScript types
-└── utils/              # Utility functions
+│   ├── auth/              # Authentication components
+│   ├── files/             # File management components
+│   │   ├── FileUploadEnhanced.tsx   # AFGH file upload
+│   │   ├── FileList.tsx             # File listing
+│   │   └── FileShareDialog.tsx      # Share with re-encryption
+│   ├── layout/            # Layout and navigation
+│   └── ui/                # Reusable UI components
+├── contexts/
+│   └── AuthContext.tsx    # Auth + AFGH key management
+├── pages/                 # Page components
+├── services/
+│   ├── apiService.ts      # API communication (mock/real)
+│   ├── afghService.ts     # AFGH crypto operations ⭐
+│   ├── afghFileService.ts # File encryption with AFGH ⭐
+│   └── keyStorageService.ts # IndexedDB key storage
+├── types/
+│   ├── afgh.ts            # AFGH type definitions ⭐
+│   └── index.ts           # General types
+└── utils/                 # Utility functions
 ```
+
+**Key Files:**
+- `afghService.ts` - Core AFGH implementation (Level 1/2, re-encryption)
+- `afghFileService.ts` - Hybrid KEM-DEM file encryption
+- `keyStorageService.ts` - Secure key storage in IndexedDB
 
 ## Development Mode
 
@@ -178,16 +249,24 @@ The optimized production build will be in the `dist/` directory.
 4. Keep your browser and OS updated
 5. Use HTTPS in production environments
 
-## Tech Stack
+## 🛠️ Tech Stack
 
+### Frontend
 - **React 18** - UI framework
 - **TypeScript** - Type safety
 - **Vite** - Build tool and dev server
-- **Tailwind CSS** - Styling
+- **Tailwind CSS** - Styling (glass morphism design)
 - **React Router** - Navigation
-- **Web Crypto API** - Cryptography
-- **Axios** - HTTP client
 - **Lucide React** - Icons
+
+### Cryptography
+- **@noble/curves** - Elliptic curve operations (BLS12-381)
+- **@noble/hashes** - Cryptographic hashing (SHA-256)
+- **Web Crypto API** - AES-GCM, AES-KW, PBKDF2
+
+### Storage
+- **IndexedDB** - Secure local key storage
+- **localStorage** - Mock backend (development)
 
 ## Browser Compatibility
 

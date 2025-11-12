@@ -1,13 +1,16 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import type { AuthState, LoginCredentials, RegisterCredentials } from '../types';
+import type { AFGHKeyPair } from '../types/afgh';
 import { apiService } from '../services/apiService';
-import { cryptoService } from '../services/cryptoService';
+import { afghService } from '../services/afghService';
+import { afghStorageService } from '../services/afghStorageService';
 
 interface AuthContextType extends AuthState {
   login: (credentials: LoginCredentials) => Promise<void>;
   register: (credentials: RegisterCredentials) => Promise<void>;
   logout: () => Promise<void>;
   updateMasterKey: (password: string) => Promise<void>;
+  keyPair: AFGHKeyPair | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -32,6 +35,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isLoading: true,
     masterKey: null,
   });
+
+  const [keyPair, setKeyPair] = useState<AFGHKeyPair | null>(null);
 
   // Check for existing session on mount
   useEffect(() => {
@@ -62,21 +67,52 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const login = async (credentials: LoginCredentials) => {
     try {
-      const response = await apiService.login(credentials);
+      console.log('[Auth] Login started for:', credentials.email);
 
-      // Derive master key from password
-      const { key: masterKey } = await cryptoService.deriveKeyFromPassword(credentials.password);
+      // 1. Authenticate with server
+      const response = await apiService.login(credentials);
+      console.log('[Auth] Server authentication successful');
+
+      // 2. Initialize AFGH storage
+      await afghStorageService.init();
+
+      // 3. Derive password key with PBKDF2
+      const salt = response.user.keyDerivationSalt
+        ? afghStorageService['base64ToArray'](response.user.keyDerivationSalt)
+        : undefined;
+
+      const { key: passwordKey } = await afghStorageService.deriveKeyFromPassword(
+        credentials.password,
+        salt
+      );
+      console.log('[Auth] Password key derived');
+
+      // 4. Load AFGH key pair from IndexedDB
+      const storedKeyPair = await afghStorageService.getEncryptedKeyPair(credentials.email);
+
+      if (!storedKeyPair) {
+        throw new Error('AFGH key pair not found. Please contact support.');
+      }
+
+      // 5. Decrypt key pair
+      const afghanKeyPair = await afghStorageService.decryptKeyPair(
+        storedKeyPair.encryptedKeyPair,
+        storedKeyPair.iv,
+        passwordKey
+      );
+      console.log('[Auth] AFGH key pair loaded and decrypted');
 
       setAuthState({
         user: response.user,
         token: response.token,
         isAuthenticated: true,
         isLoading: false,
-        masterKey,
+        masterKey: passwordKey,
       });
 
-      // Store master key securely (in memory only for this session)
-      // In a production app, consider using IndexedDB with additional security
+      setKeyPair(afghanKeyPair);
+
+      console.log('[Auth] Login complete!');
     } catch (error) {
       console.error('Login error:', error);
       throw error;
@@ -85,35 +121,60 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const register = async (credentials: RegisterCredentials) => {
     try {
-      const response = await apiService.register(credentials);
+      console.log('[Auth] Registration started for:', credentials.email);
 
-      // Derive master key from password
-      const { key: masterKey } = await cryptoService.deriveKeyFromPassword(credentials.password);
+      // 1. Initialize AFGH storage
+      await afghStorageService.init();
 
-      // Generate RSA key pair for secure sharing
-      const keyPair = await cryptoService.generateKeyPair();
-      const publicKeyExported = await cryptoService.exportPublicKey(keyPair.publicKey);
+      // 2. Derive password key with PBKDF2
+      const { key: passwordKey, salt } = await afghStorageService.deriveKeyFromPassword(
+        credentials.password
+      );
+      console.log('[Auth] Password key derived');
 
-      // Store public key on server
-      // In a real implementation, you'd send this to the server
-      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-      currentUser.publicKey = publicKeyExported;
-      localStorage.setItem('currentUser', JSON.stringify(currentUser));
+      // 3. Generate AFGH key pair (2 components)
+      const afghanKeyPair = await afghService.generateKeyPair(credentials.email);
+      console.log('[Auth] AFGH key pair generated');
 
-      // Store private key securely (encrypted with master key)
-      // This is simplified - in production, use proper key storage
-      const privateKeyExported = await crypto.subtle.exportKey('pkcs8', keyPair.privateKey);
-      const encryptedPrivateKey = await cryptoService.encryptData(privateKeyExported, masterKey);
-      localStorage.setItem('encryptedPrivateKey', cryptoService.arrayBufferToBase64(encryptedPrivateKey.encryptedData));
-      localStorage.setItem('privateKeyIV', cryptoService.uint8ArrayToBase64(encryptedPrivateKey.iv));
+      // 4. Encrypt and store key pair in IndexedDB
+      const { encryptedKeyPair, iv } = await afghStorageService.encryptKeyPair(
+        afghanKeyPair,
+        passwordKey
+      );
+
+      await afghStorageService.storeEncryptedKeyPair(
+        credentials.email,
+        encryptedKeyPair,
+        iv
+      );
+      console.log('[Auth] AFGH key pair encrypted and stored');
+
+      // 5. Extract public key for server
+      const publicKey = afghService.extractPublicKey(afghanKeyPair);
+      const publicKeyData = {
+        publicKey1: afghStorageService['arrayToBase64'](publicKey.publicKey1),
+        publicKey2: afghStorageService['arrayToBase64'](publicKey.publicKey2),
+      };
+
+      // 6. Register with server
+      const response = await apiService.register({
+        ...credentials,
+        publicKey: publicKeyData,
+        keyDerivationSalt: afghStorageService['arrayToBase64'](salt),
+      });
+      console.log('[Auth] Server registration successful');
 
       setAuthState({
-        user: { ...response.user, publicKey: publicKeyExported },
+        user: { ...response.user, publicKey: publicKeyData },
         token: response.token,
         isAuthenticated: true,
         isLoading: false,
-        masterKey,
+        masterKey: passwordKey,
       });
+
+      setKeyPair(afghanKeyPair);
+
+      console.log('[Auth] Registration complete!');
     } catch (error) {
       console.error('Registration error:', error);
       throw error;
@@ -134,14 +195,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         isLoading: false,
         masterKey: null,
       });
+      setKeyPair(null);
     }
   };
 
   const updateMasterKey = async (password: string) => {
-    const { key: masterKey } = await cryptoService.deriveKeyFromPassword(password);
+    const { key: passwordKey } = await afghStorageService.deriveKeyFromPassword(password);
     setAuthState((prev) => ({
       ...prev,
-      masterKey,
+      masterKey: passwordKey,
     }));
   };
 
@@ -153,6 +215,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         register,
         logout,
         updateMasterKey,
+        keyPair,
       }}
     >
       {children}
