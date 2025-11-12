@@ -6,6 +6,9 @@ import boto3
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import create_engine, text
+from urllib.parse import urlparse, urlunparse
+PUBLIC_S3_ENDPOINT = os.getenv("PUBLIC_S3_ENDPOINT", "http://localhost:9000")
+
 
 # ----- Vars d'env -----
 S3_ENDPOINT   = os.getenv("S3_ENDPOINT", "http://minio1:9000")
@@ -44,6 +47,11 @@ class CommitReq(BaseModel):
     file_id: str
     chunk_hashes: List[str]  # sha256 of ciphertext, position = offset
 
+def _make_public(url: str) -> str:
+    public = urlparse(PUBLIC_S3_ENDPOINT)
+    u = urlparse(url)
+    return urlunparse(u._replace(scheme=public.scheme, netloc=public.netloc))
+
 @app.post("/upload/init")
 def init_upload(req: InitUploadReq):
     file_id = str(uuid.uuid4())
@@ -64,6 +72,8 @@ def presign(req: PresignReq):
             Params={"Bucket": S3_BUCKET, "Key": s3_key},
             ExpiresIn=int(timedelta(minutes=15).total_seconds()),
         )
+        url = s3.generate_presigned_url(... )
+        url = _make_public(url)
         urls.append({"offset": offset, "url": url, "s3_key": s3_key})
     return {"parts": urls}
 
@@ -97,5 +107,7 @@ def list_download(file_id: str):
             Params={"Bucket": S3_BUCKET, "Key": r["s3_key"]},
             ExpiresIn=900,
         )
+        url = s3.generate_presigned_url(... )
+        url = _make_public(url)
         parts.append({"offset": r["chunk_index"], "sha256": r["sha256"], "url": url})
     return {"parts": parts}

@@ -112,6 +112,7 @@ services:
       - S3_BUCKET=${S3_BUCKET}
       - S3_ACCESS_KEY=${S3_ACCESS_KEY}
       - S3_SECRET_KEY=${S3_SECRET_KEY}
+      - PUBLIC_S3_ENDPOINT=http://localhost:9000
       - DATABASE_URL=postgresql+psycopg2://${PG_USER}:${PG_PASSWORD}@postgres:5432/${PG_DB}
     depends_on: [postgres, mc]
     ports:
