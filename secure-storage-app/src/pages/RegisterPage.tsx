@@ -1,7 +1,7 @@
-import React from 'react';
-import { RegisterForm } from '../components/auth/RegisterForm';
-import { Card } from '../components/ui';
-import { Shield, Key, Lock } from 'lucide-react';
+import React from "react";
+import { RegisterForm } from "../components/auth/RegisterForm";
+import { Card } from "../components/ui";
+import { Key, Lock } from "lucide-react";
 
 export const RegisterPage: React.FC = () => {
   return (
@@ -16,11 +16,17 @@ export const RegisterPage: React.FC = () => {
       <div className="max-w-md w-full relative z-10">
         {/* Header */}
         <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-3xl mb-6 shadow-2xl shadow-blue-500/30 transform hover:scale-105 transition-transform duration-300">
-            <Shield className="h-10 w-10 text-white" strokeWidth={1.5} />
+          <div className="inline-flex items-center justify-center mb-6">
+            <img
+              src="/Logo_VaultFlow.svg"
+              alt="VaultFlow Logo"
+              className="h-24 w-auto transform hover:scale-105 transition-transform duration-300"
+            />
           </div>
           <h1 className="text-4xl font-bold mb-3">
-            <span className="gradient-text">Secure Storage</span>
+            <span className="bg-gradient-to-r from-primary-600 to-secondary-400 bg-clip-text text-transparent">
+              Vault<span className="font-normal">Flow</span>
+            </span>
           </h1>
           <p className="text-gray-600 text-lg">
             Create your encrypted storage account
@@ -29,7 +35,9 @@ export const RegisterPage: React.FC = () => {
 
         {/* Register Card */}
         <Card>
-          <h2 className="text-2xl font-bold text-gray-800 mb-8">Get started</h2>
+          <h2 className="text-2xl font-bold text-gray-800 mb-8 justify-center flex items-center">
+            Get Started !
+          </h2>
           <RegisterForm />
         </Card>
 
@@ -37,7 +45,7 @@ export const RegisterPage: React.FC = () => {
         <div className="mt-8 glass-card">
           <div className="flex items-center justify-center gap-8 text-sm">
             <div className="flex items-center gap-2 text-gray-600">
-              <Key className="h-4 w-4 text-blue-600" />
+              <Key className="h-4 w-4 text-primary-600" />
               <span>Keys from password</span>
             </div>
             <div className="flex items-center gap-2 text-gray-600">

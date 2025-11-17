@@ -27,6 +27,11 @@ export interface EncryptedFile {
   encryptedDataUrl: string; // URL to encrypted file data
   iv: string; // Initialization vector (base64)
   salt: string; // Salt for key derivation (base64)
+  starred?: boolean; // Marked as favorite
+  folderId?: string; // Folder containing this file
+  uploadedBy?: string; // User email who uploaded
+  teamId?: string; // Team with which this file is shared
+  sharedWith?: string[]; // List of user IDs with whom this file is shared
 }
 
 export interface DecryptedFileMetadata {

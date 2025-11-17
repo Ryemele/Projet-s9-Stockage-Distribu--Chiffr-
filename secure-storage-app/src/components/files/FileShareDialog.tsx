@@ -12,13 +12,13 @@ interface FileShareDialogProps {
 }
 
 /**
- * FileShareDialog Component - Temporary Stub
- * TODO: Implement with AFGH re-encryption
+ * FileShareDialog Component - Placeholder
+ * TODO: Implement file sharing with pyUmbrel backend
  *
- * To implement:
- * - Use afghService.generateReEncryptionKey() to create rk_{A→B}
- * - Send re-encryption key to HSM service on backend
- * - See WHAT_TO_DO_NEXT.md for complete implementation guide
+ * Future implementation:
+ * - Use pyUmbrel for re-encryption on the gateway
+ * - Send share request to backend
+ * - Backend handles encryption key management
  */
 export const FileShareDialog: React.FC<FileShareDialogProps> = ({
   fileName,
@@ -31,7 +31,7 @@ export const FileShareDialog: React.FC<FileShareDialogProps> = ({
         <div className="flex items-center justify-between p-6 border-b">
           <div className="flex items-center space-x-3">
             <div className="p-2 bg-blue-100 rounded-lg">
-              <Share2 className="h-5 w-5 text-blue-600" />
+              <Share2 className="h-5 w-5 text-primary-600" />
             </div>
             <div>
               <h2 className="text-lg font-semibold text-gray-900">Share File</h2>
@@ -50,18 +50,17 @@ export const FileShareDialog: React.FC<FileShareDialogProps> = ({
         <div className="p-6 space-y-4">
           <Alert
             type="info"
-            message="File sharing coming soon. Backend HSM implementation required."
+            message="File sharing will be implemented with pyUmbrel backend integration."
           />
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
-            <h3 className="font-semibold text-blue-900 mb-2">Implementation Note</h3>
-            <p className="text-sm text-blue-700">
-              This component needs to be implemented with AFGH re-encryption.
+          <div className="bg-primary-50 border border-blue-200 rounded-lg p-4 mt-4">
+            <h3 className="font-semibold text-blue-900 mb-2">Coming Soon</h3>
+            <p className="text-sm text-primary-700">
+              File sharing will be implemented using pyUmbrel for secure re-encryption on the gateway.
             </p>
-            <ul className="text-sm text-blue-700 mt-2 list-disc list-inside space-y-1">
-              <li>Get recipient's public key from server</li>
-              <li>Generate re-encryption key: <code className="bg-blue-100 px-1">afghService.generateReEncryptionKey()</code></li>
-              <li>Send to HSM service for proxy re-encryption</li>
-              <li>See <code className="bg-blue-100 px-1">WHAT_TO_DO_NEXT.md</code> for the complete code</li>
+            <ul className="text-sm text-primary-700 mt-2 list-disc list-inside space-y-1">
+              <li>Gateway-based re-encryption using pyUmbrel</li>
+              <li>Secure key management on backend</li>
+              <li>End-to-end encryption maintained</li>
             </ul>
           </div>
         </div>

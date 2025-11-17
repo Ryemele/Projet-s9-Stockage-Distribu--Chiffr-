@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import axios, { type AxiosInstance } from "axios";
+import { mockCryptoService } from "./mockCryptoService";
 import type {
   User,
   LoginCredentials,
@@ -106,10 +107,10 @@ class ApiService {
       salt: string;
     }
   ): Promise<EncryptedFile> {
-    // AFGH envelope format (single parameter)
+    // Mock envelope format (single parameter)
     if (!metadata && typeof dataOrEnvelope === 'object' && 'fileId' in dataOrEnvelope) {
       if (this.USE_MOCK) {
-        // Mock: Save AFGH envelope to localStorage
+        // Mock: Save envelope to localStorage
         const user = JSON.parse(localStorage.getItem("currentUser") || "{}");
         const files = JSON.parse(localStorage.getItem("mockFiles") || "[]");
 
@@ -120,9 +121,9 @@ class ApiService {
           mimeType: dataOrEnvelope.mimeType,
           uploadedAt: new Date().toISOString(),
           userId: user.id,
-          encryptedDataUrl: JSON.stringify(dataOrEnvelope), // Store the entire envelope
-          iv: Array.from(dataOrEnvelope.wrapKeyIV).map((b: number) => b.toString(16).padStart(2, '0')).join(''),
-          salt: dataOrEnvelope.kdfSalt ? Array.from(dataOrEnvelope.kdfSalt).map((b: number) => b.toString(16).padStart(2, '0')).join('') : ''
+          encryptedDataUrl: mockCryptoService.serializeEnvelope(dataOrEnvelope), // Serialize properly
+          iv: dataOrEnvelope.timestamp, // Use timestamp as IV for simplicity
+          salt: ''
         };
 
         files.push(newFile);
@@ -132,7 +133,7 @@ class ApiService {
         return newFile;
       }
 
-      // Real API call for AFGH
+      // Real API call
       const response = await this.api.post<EncryptedFile>(
         "/files/upload",
         dataOrEnvelope

@@ -1,16 +1,16 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import type { AuthState, LoginCredentials, RegisterCredentials } from '../types';
-import type { AFGHKeyPair } from '../types/afgh';
+import type { MockKeyPair } from '../services/mockCryptoService';
 import { apiService } from '../services/apiService';
-import { afghService } from '../services/afghService';
-import { afghStorageService } from '../services/afghStorageService';
+import { mockCryptoService } from '../services/mockCryptoService';
+import { mockStorageService } from '../services/mockStorageService';
 
 interface AuthContextType extends AuthState {
   login: (credentials: LoginCredentials) => Promise<void>;
   register: (credentials: RegisterCredentials) => Promise<void>;
   logout: () => Promise<void>;
   updateMasterKey: (password: string) => Promise<void>;
-  keyPair: AFGHKeyPair | null;
+  keyPair: MockKeyPair | null;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -36,7 +36,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     masterKey: null,
   });
 
-  const [keyPair, setKeyPair] = useState<AFGHKeyPair | null>(null);
+  const [keyPair, setKeyPair] = useState<MockKeyPair | null>(null);
 
   // Check for existing session on mount
   useEffect(() => {
@@ -73,34 +73,28 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const response = await apiService.login(credentials);
       console.log('[Auth] Server authentication successful');
 
-      // 2. Initialize AFGH storage
-      await afghStorageService.init();
+      // 2. Initialize mock storage
+      await mockStorageService.init();
 
-      // 3. Derive password key with PBKDF2
+      // 3. Derive password key
       const salt = response.user.keyDerivationSalt
-        ? afghStorageService['base64ToArray'](response.user.keyDerivationSalt)
+        ? mockStorageService.base64ToArray(response.user.keyDerivationSalt)
         : undefined;
 
-      const { key: passwordKey } = await afghStorageService.deriveKeyFromPassword(
+      const { key: passwordKey } = await mockStorageService.deriveKeyFromPassword(
         credentials.password,
         salt
       );
       console.log('[Auth] Password key derived');
 
-      // 4. Load AFGH key pair from IndexedDB
-      const storedKeyPair = await afghStorageService.getEncryptedKeyPair(credentials.email);
+      // 4. Load mock key pair from storage
+      const mockKeyPair = await mockStorageService.getKeyPair(credentials.email, passwordKey);
 
-      if (!storedKeyPair) {
-        throw new Error('AFGH key pair not found. Please contact support.');
+      if (!mockKeyPair) {
+        throw new Error('Key pair not found. Please contact support.');
       }
 
-      // 5. Decrypt key pair
-      const afghanKeyPair = await afghStorageService.decryptKeyPair(
-        storedKeyPair.encryptedKeyPair,
-        storedKeyPair.iv,
-        passwordKey
-      );
-      console.log('[Auth] AFGH key pair loaded and decrypted');
+      console.log('[Auth] Key pair loaded');
 
       setAuthState({
         user: response.user,
@@ -110,7 +104,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         masterKey: passwordKey,
       });
 
-      setKeyPair(afghanKeyPair);
+      setKeyPair(mockKeyPair);
 
       console.log('[Auth] Login complete!');
     } catch (error) {
@@ -123,44 +117,38 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       console.log('[Auth] Registration started for:', credentials.email);
 
-      // 1. Initialize AFGH storage
-      await afghStorageService.init();
+      // 1. Initialize mock storage
+      await mockStorageService.init();
 
-      // 2. Derive password key with PBKDF2
-      const { key: passwordKey, salt } = await afghStorageService.deriveKeyFromPassword(
+      // 2. Derive password key
+      const { key: passwordKey, salt } = await mockStorageService.deriveKeyFromPassword(
         credentials.password
       );
       console.log('[Auth] Password key derived');
 
-      // 3. Generate AFGH key pair (2 components)
-      const afghanKeyPair = await afghService.generateKeyPair(credentials.email);
-      console.log('[Auth] AFGH key pair generated');
+      // 3. Generate mock key pair
+      const mockKeyPair = await mockCryptoService.generateKeyPair(credentials.email);
+      console.log('[Auth] Mock key pair generated');
 
-      // 4. Encrypt and store key pair in IndexedDB
-      const { encryptedKeyPair, iv } = await afghStorageService.encryptKeyPair(
-        afghanKeyPair,
+      // 4. Store key pair
+      await mockStorageService.storeKeyPair(
+        credentials.email,
+        mockKeyPair,
         passwordKey
       );
+      console.log('[Auth] Key pair stored');
 
-      await afghStorageService.storeEncryptedKeyPair(
-        credentials.email,
-        encryptedKeyPair,
-        iv
-      );
-      console.log('[Auth] AFGH key pair encrypted and stored');
-
-      // 5. Extract public key for server
-      const publicKey = afghService.extractPublicKey(afghanKeyPair);
+      // 5. Prepare public key data for server
       const publicKeyData = {
-        publicKey1: afghStorageService['arrayToBase64'](publicKey.publicKey1),
-        publicKey2: afghStorageService['arrayToBase64'](publicKey.publicKey2),
+        publicKey1: mockKeyPair.publicKey,
+        publicKey2: mockKeyPair.publicKey, // Simplified for mock
       };
 
       // 6. Register with server
       const response = await apiService.register({
         ...credentials,
         publicKey: publicKeyData,
-        keyDerivationSalt: afghStorageService['arrayToBase64'](salt),
+        keyDerivationSalt: mockStorageService.arrayToBase64(salt),
       });
       console.log('[Auth] Server registration successful');
 
@@ -172,7 +160,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         masterKey: passwordKey,
       });
 
-      setKeyPair(afghanKeyPair);
+      setKeyPair(mockKeyPair);
 
       console.log('[Auth] Registration complete!');
     } catch (error) {
@@ -200,7 +188,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const updateMasterKey = async (password: string) => {
-    const { key: passwordKey } = await afghStorageService.deriveKeyFromPassword(password);
+    const { key: passwordKey } = await mockStorageService.deriveKeyFromPassword(password);
     setAuthState((prev) => ({
       ...prev,
       masterKey: passwordKey,

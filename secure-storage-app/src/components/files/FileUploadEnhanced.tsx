@@ -1,21 +1,18 @@
 import React, { useState, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { afghFileService } from '../../services/afghFileService';
+import { mockCryptoService, type MockFileEnvelope } from '../../services/mockCryptoService';
 import { apiService } from '../../services/apiService';
 import { Button, Alert } from '../ui';
 import { Upload, File, X, Lock, Shield } from 'lucide-react';
-import type { AFGHFileEnvelope } from '../../types/afgh';
 
 /**
- * Enhanced File Upload Component with AFGH Encryption
+ * Enhanced File Upload Component
  *
  * Features:
- * - AFGH Proxy Re-Encryption (BLS12-381)
- * - Chunked encryption (1 MB chunks)
- * - KEM-DEM hybrid approach
+ * - File encryption simulation
  * - Progress tracking per file
- * - Integrity checks (hash before encryption)
- * - Zero-knowledge architecture
+ * - UI testing ready
+ * - Will be integrated with pyUmbrel for real encryption
  */
 
 interface UploadingFile {
@@ -24,7 +21,7 @@ interface UploadingFile {
   progress: number;
   statusMessage: string;
   error?: string;
-  envelope?: AFGHFileEnvelope;
+  envelope?: MockFileEnvelope;
 }
 
 export const FileUploadEnhanced: React.FC<{ onUploadComplete?: () => void }> = ({
@@ -85,7 +82,7 @@ export const FileUploadEnhanced: React.FC<{ onUploadComplete?: () => void }> = (
 
   const handleUpload = async () => {
     if (!masterKey || !keyPair) {
-      setError('AFGH keys not available. Please log in again.');
+      setError('Keys not available. Please log in again.');
       return;
     }
 
@@ -110,8 +107,8 @@ export const FileUploadEnhanced: React.FC<{ onUploadComplete?: () => void }> = (
             progress: 0
           });
 
-          // Encrypt file with AFGH (KEM-DEM hybrid)
-          const envelope = await afghFileService.encryptFile(
+          // Encrypt file with mock service
+          const envelope = await mockCryptoService.encryptFile(
             file,
             keyPair,
             (progress, status) => {
@@ -132,27 +129,14 @@ export const FileUploadEnhanced: React.FC<{ onUploadComplete?: () => void }> = (
             envelope
           });
 
-          // Convert envelope for API
+          // Convert envelope for API (simplified)
           const uploadData = {
             fileId: envelope.fileId,
             fileName: envelope.fileName,
             fileSize: envelope.fileSize,
             mimeType: envelope.mimeType,
-
-            // KEM (AFGH)
-            kemCiphertext: {
-              U: arrayToBase64(envelope.kemCiphertext.U),
-              V: arrayToBase64(envelope.kemCiphertext.V),
-              level: envelope.kemCiphertext.level
-            },
-            wrappedFileKey: envelope.wrappedFileKey,
-            wrapKeyIV: envelope.wrapKeyIV,
-
-            // DEM (AES chunks)
-            chunks: envelope.chunks,
-
-            // Metadata
-            metadata: envelope.metadata
+            encryptedData: envelope.encryptedData,
+            timestamp: envelope.timestamp
           };
 
           // Upload to server
@@ -191,11 +175,6 @@ export const FileUploadEnhanced: React.FC<{ onUploadComplete?: () => void }> = (
     }
   };
 
-  // Helper function
-  const arrayToBase64 = (array: Uint8Array): string => {
-    return btoa(String.fromCharCode(...array));
-  };
-
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes';
     const k = 1024;
@@ -212,7 +191,7 @@ export const FileUploadEnhanced: React.FC<{ onUploadComplete?: () => void }> = (
         return 'text-red-600';
       case 'encrypting':
       case 'uploading':
-        return 'text-blue-600';
+        return 'text-primary-600';
       default:
         return 'text-gray-600';
     }
@@ -220,36 +199,23 @@ export const FileUploadEnhanced: React.FC<{ onUploadComplete?: () => void }> = (
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Upload className="w-6 h-6" />
-            Upload Files
-          </h2>
-          <p className="mt-1 text-sm text-gray-600 flex items-center gap-2">
-            <Lock className="w-4 h-4" />
-            Files are encrypted with AFGH before upload
-          </p>
-        </div>
-      </div>
-
       {/* Encryption Info */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+      <div className="bg-primary-50/50 border border-blue-100 rounded-lg p-4">
         <div className="flex items-start gap-3">
-          <Shield className="w-5 h-5 text-blue-600 mt-0.5" />
+          <div className="w-9 h-9 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+            <Shield className="w-5 h-5 text-primary-600" />
+          </div>
           <div className="flex-1">
-            <h3 className="font-semibold text-blue-900">AFGH Proxy Re-Encryption</h3>
-            <p className="text-sm text-blue-700 mt-1">
-              Your files are encrypted using BLS12-381 pairing-based cryptography with hybrid KEM-DEM.
-              The server can never decrypt your files, even when sharing with others.
+            <h3 className="font-medium text-gray-900">End-to-end encrypted</h3>
+            <p className="text-sm text-gray-600 mt-0.5">
+              Your files are encrypted before upload. Only you can decrypt them.
             </p>
           </div>
         </div>
       </div>
 
       {/* File Input */}
-      <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-500 transition-colors">
+      <div className="border-2 border-dashed border-gray-300 rounded-xl p-12 text-center hover:border-blue-400 hover:bg-primary-50/30 transition-all duration-200">
         <input
           ref={fileInputRef}
           type="file"
@@ -258,46 +224,57 @@ export const FileUploadEnhanced: React.FC<{ onUploadComplete?: () => void }> = (
           className="hidden"
           disabled={isUploading}
         />
-        <Upload className="mx-auto h-12 w-12 text-gray-400" />
-        <p className="mt-2 text-sm text-gray-600">
+        <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-50 rounded-full mb-4">
+          <Upload className="h-8 w-8 text-primary-600" />
+        </div>
+        <h3 className="text-lg font-medium text-gray-900 mb-1">
+          Drop files here to upload
+        </h3>
+        <p className="text-sm text-gray-600 mb-4">
+          or{' '}
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="font-medium text-blue-600 hover:text-blue-500"
+            className="font-medium text-primary-600 hover:text-blue-500 hover:underline"
             disabled={isUploading}
           >
-            Click to select files
+            browse from your computer
           </button>
-          {' '}or drag and drop
         </p>
-        <p className="mt-1 text-xs text-gray-500">
-          Multiple files supported, up to 5 GB each
+        <p className="text-xs text-gray-500">
+          Multiple files supported • Max 5 GB per file
         </p>
       </div>
 
       {/* Selected Files */}
       {uploadingFiles.size > 0 && (
         <div className="space-y-3">
-          <h3 className="font-semibold text-gray-900">Selected Files ({uploadingFiles.size})</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-medium text-gray-700">
+              {uploadingFiles.size} {uploadingFiles.size === 1 ? 'file' : 'files'} selected
+            </h3>
+          </div>
 
           {Array.from(uploadingFiles.values()).map((uploadFile) => (
             <div
               key={uploadFile.file.name}
-              className="bg-white border border-gray-200 rounded-lg p-4"
+              className="bg-gray-50 border border-gray-200 rounded-lg p-4 hover:bg-gray-100 transition-colors"
             >
               <div className="flex items-start justify-between">
-                <div className="flex items-start gap-3 flex-1">
-                  <File className="w-5 h-5 text-gray-400 mt-1" />
+                <div className="flex items-start gap-3 flex-1 min-w-0">
+                  <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center flex-shrink-0 border border-gray-200">
+                    <File className="w-5 h-5 text-primary-600" />
+                  </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate">
                       {uploadFile.file.name}
                     </p>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-gray-500 mt-0.5">
                       {formatFileSize(uploadFile.file.size)}
                     </p>
 
                     {/* Status */}
-                    <p className={`text-xs mt-2 ${getStatusColor(uploadFile.status)}`}>
+                    <p className={`text-xs mt-2 font-medium ${getStatusColor(uploadFile.status)}`}>
                       {uploadFile.statusMessage}
                       {uploadFile.error && ` - ${uploadFile.error}`}
                     </p>
@@ -305,13 +282,13 @@ export const FileUploadEnhanced: React.FC<{ onUploadComplete?: () => void }> = (
                     {/* Progress Bar */}
                     {(uploadFile.status === 'encrypting' || uploadFile.status === 'uploading') && (
                       <div className="mt-2">
-                        <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div className="w-full bg-gray-200 rounded-full h-1.5">
                           <div
-                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                            className="bg-primary-600 h-1.5 rounded-full transition-all duration-300"
                             style={{ width: `${uploadFile.progress}%` }}
                           />
                         </div>
-                        <p className="text-xs text-gray-500 mt-1">{uploadFile.progress}%</p>
+                        <p className="text-xs text-gray-500 mt-1.5">{uploadFile.progress}%</p>
                       </div>
                     )}
                   </div>
@@ -320,9 +297,9 @@ export const FileUploadEnhanced: React.FC<{ onUploadComplete?: () => void }> = (
                 {uploadFile.status === 'pending' && (
                   <button
                     onClick={() => removeFile(uploadFile.file.name)}
-                    className="text-gray-400 hover:text-gray-600"
+                    className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded-lg transition-colors"
                   >
-                    <X className="w-5 h-5" />
+                    <X className="w-4 h-4" />
                   </button>
                 )}
               </div>
@@ -337,14 +314,17 @@ export const FileUploadEnhanced: React.FC<{ onUploadComplete?: () => void }> = (
 
       {/* Upload Button */}
       {selectedFiles.length > 0 && (
-        <div className="flex justify-end">
-          <Button
+        <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+          <p className="text-sm text-gray-600">
+            {selectedFiles.length} {selectedFiles.length === 1 ? 'file' : 'files'} ready to upload
+          </p>
+          <button
             onClick={handleUpload}
             disabled={isUploading}
-            className="px-6"
+            className="px-6 py-2.5 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm hover:shadow-md"
           >
-            {isUploading ? 'Uploading...' : `Upload ${selectedFiles.length} File(s)`}
-          </Button>
+            {isUploading ? 'Uploading...' : `Upload ${selectedFiles.length === 1 ? 'File' : 'Files'}`}
+          </button>
         </div>
       )}
     </div>
