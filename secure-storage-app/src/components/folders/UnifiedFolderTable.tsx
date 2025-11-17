@@ -43,7 +43,7 @@ interface UnifiedFolderTableProps {
 }
 
 export const UnifiedFolderTable: React.FC<UnifiedFolderTableProps> = ({
-  folderId,
+  //folderId,
   folders,
   files,
   onDeleteFolder,

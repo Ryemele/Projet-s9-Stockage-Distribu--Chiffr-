@@ -1,13 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Search, FileIcon, Folder, X } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { getAllFiles, getAllFolders } from '../../mocks';
-import type { EncryptedFile } from '../../types';
-import type { Folder as FolderType } from '../../types/folder';
+import React, { useState, useEffect, useRef } from "react";
+import { Search, FileIcon, Folder, X } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { getAllFiles, getAllFolders } from "../../mocks";
+import type { EncryptedFile } from "../../types";
+import type { Folder as FolderType } from "../../types/folder";
 
 export const GlobalSearch: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState("");
   const [results, setResults] = useState<{
     files: EncryptedFile[];
     folders: FolderType[];
@@ -18,33 +18,36 @@ export const GlobalSearch: React.FC = () => {
   // Handle keyboard shortcut (Cmd/Ctrl + K)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
         setIsOpen(true);
       }
-      if (e.key === 'Escape') {
+      if (e.key === "Escape") {
         setIsOpen(false);
-        setQuery('');
+        setQuery("");
       }
     };
 
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
   }, []);
 
   // Handle click outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+      if (
+        searchRef.current &&
+        !searchRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false);
       }
     };
 
     if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener("mousedown", handleClickOutside);
     }
 
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [isOpen]);
 
   // Search logic
@@ -59,33 +62,33 @@ export const GlobalSearch: React.FC = () => {
     const allFolders = getAllFolders();
 
     const filteredFiles = allFiles
-      .filter(file => file.name.toLowerCase().includes(searchQuery))
+      .filter((file) => file.name.toLowerCase().includes(searchQuery))
       .slice(0, 5);
 
     const filteredFolders = allFolders
-      .filter(folder => folder.name.toLowerCase().includes(searchQuery))
+      .filter((folder) => folder.name.toLowerCase().includes(searchQuery))
       .slice(0, 5);
 
     setResults({ files: filteredFiles, folders: filteredFolders });
   }, [query]);
 
-  const handleFileClick = (file: EncryptedFile) => {
+  const handleFileClick = () => {
     setIsOpen(false);
-    setQuery('');
-    navigate('/files');
+    setQuery("");
+    navigate("/files");
   };
 
   const handleFolderClick = (folder: FolderType) => {
     setIsOpen(false);
-    setQuery('');
+    setQuery("");
     navigate(`/folder/${folder.id}`);
   };
 
   const formatSize = (bytes: number): string => {
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
-    if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + ' MB';
-    return (bytes / 1073741824).toFixed(2) + ' GB';
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + " KB";
+    if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + " MB";
+    return (bytes / 1073741824).toFixed(2) + " GB";
   };
 
   return (
@@ -97,7 +100,9 @@ export const GlobalSearch: React.FC = () => {
           className="w-full flex items-center gap-3 px-4 py-2 bg-white border border-gray-200 rounded-lg hover:border-gray-300 transition-colors text-left"
         >
           <Search className="h-4 w-4 text-gray-400" />
-          <span className="text-sm text-gray-500 flex-1">Search files and folders...</span>
+          <span className="text-sm text-gray-500 flex-1">
+            Search files and folders...
+          </span>
           <kbd className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-gray-500 bg-gray-100 border border-gray-200 rounded">
             <span className="text-xs">⌘</span>K
           </kbd>
@@ -107,7 +112,10 @@ export const GlobalSearch: React.FC = () => {
       {/* Search Modal */}
       {isOpen && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-start justify-center pt-20 px-4">
-          <div ref={searchRef} className="w-full max-w-2xl bg-white rounded-xl shadow-2xl overflow-hidden">
+          <div
+            ref={searchRef}
+            className="w-full max-w-2xl bg-white rounded-xl shadow-2xl overflow-hidden"
+          >
             {/* Search Input */}
             <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-200">
               <Search className="h-5 w-5 text-gray-400 flex-shrink-0" />
@@ -121,7 +129,7 @@ export const GlobalSearch: React.FC = () => {
               />
               {query && (
                 <button
-                  onClick={() => setQuery('')}
+                  onClick={() => setQuery("")}
                   className="p-1 hover:bg-gray-100 rounded transition-colors"
                 >
                   <X className="h-4 w-4 text-gray-400" />
@@ -157,9 +165,13 @@ export const GlobalSearch: React.FC = () => {
                             <Folder className="h-4 w-4 text-primary-600" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-900 truncate">{folder.name}</p>
+                            <p className="text-sm font-medium text-gray-900 truncate">
+                              {folder.name}
+                            </p>
                             {folder.description && (
-                              <p className="text-xs text-gray-500 truncate">{folder.description}</p>
+                              <p className="text-xs text-gray-500 truncate">
+                                {folder.description}
+                              </p>
                             )}
                           </div>
                         </button>
@@ -176,16 +188,19 @@ export const GlobalSearch: React.FC = () => {
                       {results.files.map((file) => (
                         <button
                           key={file.id}
-                          onClick={() => handleFileClick(file)}
+                          onClick={() => handleFileClick()}
                           className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors text-left"
                         >
                           <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center flex-shrink-0">
                             <FileIcon className="h-4 w-4 text-blue-600" />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-900 truncate">{file.name}</p>
+                            <p className="text-sm font-medium text-gray-900 truncate">
+                              {file.name}
+                            </p>
                             <p className="text-xs text-gray-500">
-                              {formatSize(file.size)} • {file.uploadedBy || 'Unknown'}
+                              {formatSize(file.size)} •{" "}
+                              {file.uploadedBy || "Unknown"}
                             </p>
                           </div>
                         </button>
@@ -200,17 +215,25 @@ export const GlobalSearch: React.FC = () => {
             <div className="border-t border-gray-200 px-4 py-2 bg-gray-50 flex items-center justify-between text-xs text-gray-500">
               <div className="flex items-center gap-4">
                 <span className="flex items-center gap-1">
-                  <kbd className="px-1.5 py-0.5 bg-white border border-gray-200 rounded">↑</kbd>
-                  <kbd className="px-1.5 py-0.5 bg-white border border-gray-200 rounded">↓</kbd>
+                  <kbd className="px-1.5 py-0.5 bg-white border border-gray-200 rounded">
+                    ↑
+                  </kbd>
+                  <kbd className="px-1.5 py-0.5 bg-white border border-gray-200 rounded">
+                    ↓
+                  </kbd>
                   <span className="ml-1">to navigate</span>
                 </span>
                 <span className="flex items-center gap-1">
-                  <kbd className="px-1.5 py-0.5 bg-white border border-gray-200 rounded">Enter</kbd>
+                  <kbd className="px-1.5 py-0.5 bg-white border border-gray-200 rounded">
+                    Enter
+                  </kbd>
                   <span className="ml-1">to select</span>
                 </span>
               </div>
               <span className="flex items-center gap-1">
-                <kbd className="px-1.5 py-0.5 bg-white border border-gray-200 rounded">Esc</kbd>
+                <kbd className="px-1.5 py-0.5 bg-white border border-gray-200 rounded">
+                  Esc
+                </kbd>
                 <span className="ml-1">to close</span>
               </span>
             </div>

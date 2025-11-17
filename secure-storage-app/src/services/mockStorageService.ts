@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /**
  * Mock Storage Service
  *
@@ -7,7 +8,7 @@
  * Currently stores data in localStorage for simplicity.
  */
 
-import type { MockKeyPair } from './mockCryptoService';
+import type { MockKeyPair } from "./mockCryptoService";
 
 interface StoredKeyPair {
   email: string;
@@ -18,14 +19,14 @@ interface StoredKeyPair {
 }
 
 class MockStorageService {
-  private readonly STORAGE_KEY = 'mock_keypairs';
-  private readonly PASSWORD_KEYS_KEY = 'mock_password_keys';
+  private readonly STORAGE_KEY = "mock_keypairs";
+  private readonly PASSWORD_KEYS_KEY = "mock_password_keys";
 
   /**
    * Initialize storage (simulated)
    */
   async init(): Promise<void> {
-    console.log('[MockStorage] Initializing mock storage...');
+    console.log("[MockStorage] Initializing mock storage...");
     // Nothing to do for localStorage
   }
 
@@ -36,7 +37,7 @@ class MockStorageService {
     password: string,
     salt?: Uint8Array
   ): Promise<{ key: CryptoKey; salt: Uint8Array }> {
-    console.log('[MockStorage] Deriving mock password key...');
+    console.log("[MockStorage] Deriving mock password key...");
 
     // Generate or use provided salt
     const actualSalt = salt || crypto.getRandomValues(new Uint8Array(16));
@@ -45,13 +46,13 @@ class MockStorageService {
     await this.delay(300);
 
     // Create a mock CryptoKey (for compatibility)
-    const keyData = new TextEncoder().encode(password + actualSalt.join(','));
+    const keyData = new TextEncoder().encode(password + actualSalt.join(","));
     const key = await crypto.subtle.importKey(
-      'raw',
+      "raw",
       keyData.slice(0, 32), // Use first 32 bytes
-      { name: 'AES-GCM', length: 256 },
+      { name: "AES-GCM", length: 256 },
       false,
-      ['encrypt', 'decrypt']
+      ["encrypt", "decrypt"]
     );
 
     return { key, salt: actualSalt };
@@ -63,9 +64,9 @@ class MockStorageService {
   async storeKeyPair(
     email: string,
     keyPair: MockKeyPair,
-    passwordKey: CryptoKey
+    _passwordKey: CryptoKey
   ): Promise<void> {
-    console.log('[MockStorage] Storing mock key pair for:', email);
+    console.log("[MockStorage] Storing mock key pair for:", email);
 
     // Simulate encryption
     const encryptedData = btoa(JSON.stringify(keyPair));
@@ -76,34 +77,37 @@ class MockStorageService {
       keyPair,
       encryptedData,
       iv,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
 
     const allKeyPairs = this.getAllStoredKeyPairs();
     allKeyPairs[email] = storedData;
 
     localStorage.setItem(this.STORAGE_KEY, JSON.stringify(allKeyPairs));
-    console.log('[MockStorage] Key pair stored successfully');
+    console.log("[MockStorage] Key pair stored successfully");
   }
 
   /**
    * Retrieve and decrypt a key pair
    */
-  async getKeyPair(email: string, passwordKey: CryptoKey): Promise<MockKeyPair | null> {
-    console.log('[MockStorage] Retrieving mock key pair for:', email);
+  async getKeyPair(
+    email: string,
+    _passwordKey: CryptoKey
+  ): Promise<MockKeyPair | null> {
+    console.log("[MockStorage] Retrieving mock key pair for:", email);
 
     const allKeyPairs = this.getAllStoredKeyPairs();
     const stored = allKeyPairs[email];
 
     if (!stored) {
-      console.log('[MockStorage] No key pair found for:', email);
+      console.log("[MockStorage] No key pair found for:", email);
       return null;
     }
 
     // Simulate decryption delay
     await this.delay(300);
 
-    console.log('[MockStorage] Key pair retrieved successfully');
+    console.log("[MockStorage] Key pair retrieved successfully");
     return stored.keyPair;
   }
 
@@ -119,7 +123,7 @@ class MockStorageService {
    * Delete a key pair
    */
   deleteKeyPair(email: string): void {
-    console.log('[MockStorage] Deleting key pair for:', email);
+    console.log("[MockStorage] Deleting key pair for:", email);
     const allKeyPairs = this.getAllStoredKeyPairs();
     delete allKeyPairs[email];
     localStorage.setItem(this.STORAGE_KEY, JSON.stringify(allKeyPairs));
@@ -129,7 +133,7 @@ class MockStorageService {
    * Clear all stored key pairs (for testing)
    */
   clearAll(): void {
-    console.log('[MockStorage] Clearing all stored key pairs');
+    console.log("[MockStorage] Clearing all stored key pairs");
     localStorage.removeItem(this.STORAGE_KEY);
     localStorage.removeItem(this.PASSWORD_KEYS_KEY);
   }
@@ -143,12 +147,12 @@ class MockStorageService {
 
   private generateIV(): string {
     return Array.from(crypto.getRandomValues(new Uint8Array(12)))
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('');
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
   }
 
   private async delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   // Public utility methods for compatibility

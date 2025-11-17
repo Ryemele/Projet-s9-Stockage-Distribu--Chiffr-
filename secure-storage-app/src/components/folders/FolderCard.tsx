@@ -1,20 +1,32 @@
-import React from 'react';
-import { Folder, File, Trash2, Edit2, MoreVertical, FolderOpen } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import type { Folder as FolderType } from '../../types/folder';
-import { FOLDER_COLORS } from '../../types/folder';
-import { getExactFileCount, getExactSubfolderCount, calculateFolderSize, formatSize } from '../../mocks';
+import React from "react";
+import { Folder, File, Trash2, Edit2, FolderOpen } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import type { Folder as FolderType } from "../../types/folder";
+import { FOLDER_COLORS } from "../../types/folder";
+import {
+  getExactFileCount,
+  getExactSubfolderCount,
+  calculateFolderSize,
+  formatSize,
+} from "../../mocks";
 
 interface FolderCardProps {
   folder: FolderType;
   onDelete?: (folderId: string) => void;
   onEdit?: (folder: FolderType) => void;
-  viewMode?: 'grid' | 'list';
+  viewMode?: "grid" | "list";
 }
 
-export const FolderCard: React.FC<FolderCardProps> = ({ folder, onDelete, onEdit, viewMode = 'grid' }) => {
+export const FolderCard: React.FC<FolderCardProps> = ({
+  folder,
+  onDelete,
+  onEdit,
+  viewMode = "grid",
+}) => {
   const navigate = useNavigate();
-  const colorConfig = FOLDER_COLORS[folder.color as keyof typeof FOLDER_COLORS] || FOLDER_COLORS.blue;
+  const colorConfig =
+    FOLDER_COLORS[folder.color as keyof typeof FOLDER_COLORS] ||
+    FOLDER_COLORS.blue;
 
   // Get exact counts and calculated size
   const exactFileCount = getExactFileCount(folder.id);
@@ -22,10 +34,10 @@ export const FolderCard: React.FC<FolderCardProps> = ({ folder, onDelete, onEdit
   const folderSize = calculateFolderSize(folder.id);
 
   const formatDate = (dateString: string): string => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
     });
   };
 
@@ -48,7 +60,7 @@ export const FolderCard: React.FC<FolderCardProps> = ({ folder, onDelete, onEdit
   };
 
   // List view (compact single-line layout)
-  if (viewMode === 'list') {
+  if (viewMode === "list") {
     return (
       <div
         onClick={handleClick}
@@ -57,7 +69,9 @@ export const FolderCard: React.FC<FolderCardProps> = ({ folder, onDelete, onEdit
         {/* Folder Icon & Name */}
         <div className="flex items-center space-x-3 flex-1 min-w-0">
           <div className="flex-shrink-0">
-            <div className={`w-8 h-8 bg-gradient-to-br ${colorConfig.gradient} rounded-lg flex items-center justify-center`}>
+            <div
+              className={`w-8 h-8 bg-gradient-to-br ${colorConfig.gradient} rounded-lg flex items-center justify-center`}
+            >
               <Folder className="h-4 w-4 text-white" />
             </div>
           </div>
@@ -122,12 +136,16 @@ export const FolderCard: React.FC<FolderCardProps> = ({ folder, onDelete, onEdit
       className="group relative bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-all duration-200 cursor-pointer overflow-hidden"
     >
       {/* Background Pattern */}
-      <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${colorConfig.gradient} opacity-5 rounded-bl-full`} />
+      <div
+        className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${colorConfig.gradient} opacity-5 rounded-bl-full`}
+      />
 
       <div className="relative">
         {/* Header */}
         <div className="flex items-start justify-between mb-4">
-          <div className={`w-14 h-14 bg-gradient-to-br ${colorConfig.gradient} rounded-xl flex items-center justify-center shadow-md group-hover:scale-110 transition-transform duration-200`}>
+          <div
+            className={`w-14 h-14 bg-gradient-to-br ${colorConfig.gradient} rounded-xl flex items-center justify-center shadow-md group-hover:scale-110 transition-transform duration-200`}
+          >
             <Folder className="h-7 w-7 text-white" />
           </div>
 
@@ -155,7 +173,9 @@ export const FolderCard: React.FC<FolderCardProps> = ({ folder, onDelete, onEdit
             {folder.name}
           </h3>
           {folder.description && (
-            <p className="text-sm text-gray-600 line-clamp-2">{folder.description}</p>
+            <p className="text-sm text-gray-600 line-clamp-2">
+              {folder.description}
+            </p>
           )}
         </div>
 
@@ -165,19 +185,21 @@ export const FolderCard: React.FC<FolderCardProps> = ({ folder, onDelete, onEdit
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2 text-sm text-gray-600">
                 <File className="h-4 w-4" />
-                <span>{exactFileCount} {exactFileCount === 1 ? 'file' : 'files'}</span>
+                <span>
+                  {exactFileCount} {exactFileCount === 1 ? "file" : "files"}
+                </span>
               </div>
               <div className="flex items-center gap-2 text-sm text-gray-600">
                 <FolderOpen className="h-4 w-4" />
-                <span>{exactSubfolderCount} {exactSubfolderCount === 1 ? 'folder' : 'folders'}</span>
+                <span>
+                  {exactSubfolderCount}{" "}
+                  {exactSubfolderCount === 1 ? "folder" : "folders"}
+                </span>
               </div>
             </div>
           </div>
-          <div className="text-sm text-gray-500">
-            {formatSize(folderSize)}
-          </div>
+          <div className="text-sm text-gray-500">{formatSize(folderSize)}</div>
         </div>
-
       </div>
     </div>
   );

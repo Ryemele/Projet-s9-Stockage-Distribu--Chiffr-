@@ -1,20 +1,18 @@
-import React, { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';
+import React from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../../contexts/AuthContext";
 import {
   Home,
   Files,
-  Upload,
   Share2,
   Users,
   User,
   Settings,
   LogOut,
-  FolderOpen,
   Folder,
-  HardDrive
-} from 'lucide-react';
-import { calculateTotalStorage, formatSize } from '../../mocks';
+  HardDrive,
+} from "lucide-react";
+import { calculateTotalStorage, formatSize } from "../../mocks";
 
 interface NavItem {
   name: string;
@@ -35,20 +33,20 @@ export const Sidebar: React.FC = () => {
 
   const handleLogout = async () => {
     await logout();
-    navigate('/login');
+    navigate("/login");
   };
 
   const navItems: NavItem[] = [
-    { name: 'Home', path: '/home', icon: Home },
-    { name: 'My Files', path: '/files', icon: Files },
-    { name: 'Shared', path: '/shared', icon: Share2, badge: 0 },
-    { name: 'Teams', path: '/teams', icon: Users },
-    { name: 'Folders', path: '/folders', icon: Folder },
+    { name: "Home", path: "/home", icon: Home },
+    { name: "My Files", path: "/files", icon: Files },
+    { name: "Shared", path: "/shared", icon: Share2, badge: 0 },
+    { name: "Teams", path: "/teams", icon: Users },
+    { name: "Folders", path: "/folders", icon: Folder },
   ];
 
   const bottomNavItems: NavItem[] = [
-    { name: 'Profile', path: '/profile', icon: User },
-    { name: 'Settings', path: '/settings', icon: Settings },
+    { name: "Profile", path: "/profile", icon: User },
+    { name: "Settings", path: "/settings", icon: Settings },
   ];
 
   const isActive = (path: string) => {
@@ -66,8 +64,9 @@ export const Sidebar: React.FC = () => {
             className="h-12 w-auto"
           />
           <div className="text-xl font-bold">
-            <span style={{ color: '#33649d' }}>Vault</span>
-            <span style={{ color: '#51cac1' }}>Flow</span>
+            <span className="bg-gradient-to-r from-primary-600 to-secondary-400 bg-clip-text text-transparent">
+              Secure<span className="font-normal">Box</span>
+            </span>
           </div>
         </Link>
       </div>
@@ -85,16 +84,21 @@ export const Sidebar: React.FC = () => {
               className={`
                 flex items-center px-3 py-2.5 rounded-lg text-sm font-medium
                 transition-all duration-200 group relative
-                ${active
-                  ? 'bg-primary-50 text-primary-700'
-                  : 'text-gray-700 hover:bg-gray-50'
+                ${
+                  active
+                    ? "bg-primary-50 text-primary-700"
+                    : "text-gray-700 hover:bg-gray-50"
                 }
               `}
             >
               <Icon
                 className={`
                   h-5 w-5 flex-shrink-0
-                  ${active ? 'text-primary-600' : 'text-gray-500 group-hover:text-gray-700'}
+                  ${
+                    active
+                      ? "text-primary-600"
+                      : "text-gray-500 group-hover:text-gray-700"
+                  }
                 `}
                 strokeWidth={active ? 2.5 : 2}
               />
@@ -120,13 +124,15 @@ export const Sidebar: React.FC = () => {
               <HardDrive className="h-4 w-4 text-gray-600" />
               <span className="text-xs font-medium text-gray-700">Storage</span>
             </div>
-            <span className={`text-xs font-medium ${
-              storagePercentage > 90
-                ? 'text-red-600'
-                : storagePercentage > 70
-                ? 'text-yellow-600'
-                : 'text-green-600'
-            }`}>
+            <span
+              className={`text-xs font-medium ${
+                storagePercentage > 90
+                  ? "text-red-600"
+                  : storagePercentage > 70
+                  ? "text-yellow-600"
+                  : "text-green-600"
+              }`}
+            >
               {storagePercentage.toFixed(1)}%
             </span>
           </div>
@@ -134,10 +140,10 @@ export const Sidebar: React.FC = () => {
             <div
               className={`h-2 rounded-full transition-all duration-300 ${
                 storagePercentage > 90
-                  ? 'bg-red-500'
+                  ? "bg-red-500"
                   : storagePercentage > 70
-                  ? 'bg-yellow-500'
-                  : 'bg-gradient-to-r from-primary-500 to-secondary-400'
+                  ? "bg-yellow-500"
+                  : "bg-gradient-to-r from-primary-500 to-secondary-400"
               }`}
               style={{ width: `${Math.min(storagePercentage, 100)}%` }}
             ></div>
@@ -162,16 +168,21 @@ export const Sidebar: React.FC = () => {
                 className={`
                   flex items-center px-3 py-2.5 rounded-lg text-sm font-medium
                   transition-all duration-200 group
-                  ${active
-                    ? 'bg-primary-50 text-primary-700'
-                    : 'text-gray-700 hover:bg-gray-50'
+                  ${
+                    active
+                      ? "bg-primary-50 text-primary-700"
+                      : "text-gray-700 hover:bg-gray-50"
                   }
                 `}
               >
                 <Icon
                   className={`
                     h-5 w-5 flex-shrink-0
-                    ${active ? 'text-primary-600' : 'text-gray-500 group-hover:text-gray-700'}
+                    ${
+                      active
+                        ? "text-primary-600"
+                        : "text-gray-500 group-hover:text-gray-700"
+                    }
                   `}
                 />
                 <span className="ml-3">{item.name}</span>
@@ -189,7 +200,9 @@ export const Sidebar: React.FC = () => {
                   <User className="h-4 w-4 text-white" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-gray-900 truncate">{user.name}</p>
+                  <p className="text-sm font-medium text-gray-900 truncate">
+                    {user.name}
+                  </p>
                   <p className="text-xs text-gray-500 truncate">{user.email}</p>
                 </div>
               </div>

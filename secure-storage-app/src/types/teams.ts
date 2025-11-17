@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'member' | 'viewer';
+export type UserRole = "admin" | "member" | "viewer";
 
 export interface TeamMember {
   id: string;
@@ -10,6 +10,7 @@ export interface TeamMember {
 }
 
 export interface Team {
+  memberCount: number;
   id: string;
   name: string;
   description: string;
@@ -34,7 +35,7 @@ export interface TeamInvitation {
   invitedBy: string;
   invitedEmail: string;
   role: UserRole;
-  status: 'pending' | 'accepted' | 'rejected';
+  status: "pending" | "accepted" | "rejected";
   createdAt: string;
   expiresAt: string;
 }

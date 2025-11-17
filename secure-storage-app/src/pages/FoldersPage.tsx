@@ -1,14 +1,28 @@
-import React, { useState } from 'react';
-import { Plus, Folder as FolderIcon, Search, Grid3x3, List, FileText } from 'lucide-react';
-import type { Folder } from '../types/folder';
-import { FolderCard } from '../components/folders/FolderCard';
-import { CreateFolderModal } from '../components/folders/CreateFolderModal';
-import { getRootFolders, getAllFolders, addFolder, deleteFolderById, getAllFiles, calculateTotalStorage, formatSize } from '../mocks';
+import React, { useState } from "react";
+import {
+  Plus,
+  Folder as FolderIcon,
+  Search,
+  Grid3x3,
+  List,
+  FileText,
+} from "lucide-react";
+import type { Folder } from "../types/folder";
+import { FolderCard } from "../components/folders/FolderCard";
+import { CreateFolderModal } from "../components/folders/CreateFolderModal";
+import {
+  getAllFolders,
+  addFolder,
+  deleteFolderById,
+  getAllFiles,
+  calculateTotalStorage,
+  formatSize,
+} from "../mocks";
 
 export const FoldersPage: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [searchQuery, setSearchQuery] = useState("");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   const [folders, setFolders] = useState<Folder[]>(getAllFolders());
 
@@ -24,15 +38,16 @@ export const FoldersPage: React.FC = () => {
 
   const handleEditFolder = (folder: Folder) => {
     // TODO: Implement edit functionality
-    console.log('Edit folder:', folder);
+    console.log("Edit folder:", folder);
   };
 
   // Only show root folders (folders without a parent)
-  const rootFolders = folders.filter(folder => !folder.parentFolderId);
+  const rootFolders = folders.filter((folder) => !folder.parentFolderId);
 
-  const filteredFolders = rootFolders.filter(folder =>
-    folder.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    folder.description?.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredFolders = rootFolders.filter(
+    (folder) =>
+      folder.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      folder.description?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   // Get exact counts
@@ -47,9 +62,7 @@ export const FoldersPage: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Folders</h1>
-          <p className="text-gray-600 mt-1">
-            Organize your files with folders
-          </p>
+          <p className="text-gray-600 mt-1">Organize your files with folders</p>
         </div>
 
         <button
@@ -94,7 +107,9 @@ export const FoldersPage: React.FC = () => {
             </div>
             <div>
               <p className="text-sm text-gray-600">Total Size</p>
-              <p className="text-2xl font-bold text-gray-900">{formatSize(totalSize)}</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {formatSize(totalSize)}
+              </p>
             </div>
           </div>
         </div>
@@ -115,22 +130,22 @@ export const FoldersPage: React.FC = () => {
 
         <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg p-1">
           <button
-            onClick={() => setViewMode('grid')}
+            onClick={() => setViewMode("grid")}
             className={`p-2 rounded transition-colors ${
-              viewMode === 'grid'
-                ? 'bg-primary-50 text-primary-600'
-                : 'text-gray-400 hover:text-gray-600'
+              viewMode === "grid"
+                ? "bg-primary-50 text-primary-600"
+                : "text-gray-400 hover:text-gray-600"
             }`}
             title="Grid view"
           >
             <Grid3x3 className="h-4 w-4" />
           </button>
           <button
-            onClick={() => setViewMode('list')}
+            onClick={() => setViewMode("list")}
             className={`p-2 rounded transition-colors ${
-              viewMode === 'list'
-                ? 'bg-primary-50 text-primary-600'
-                : 'text-gray-400 hover:text-gray-600'
+              viewMode === "list"
+                ? "bg-primary-50 text-primary-600"
+                : "text-gray-400 hover:text-gray-600"
             }`}
             title="List view"
           >
@@ -146,12 +161,12 @@ export const FoldersPage: React.FC = () => {
             <FolderIcon className="h-10 w-10 text-gray-400" />
           </div>
           <h3 className="text-lg font-medium text-gray-900 mb-2">
-            {searchQuery ? 'No folders found' : 'No folders yet'}
+            {searchQuery ? "No folders found" : "No folders yet"}
           </h3>
           <p className="text-gray-500 text-sm mb-6 max-w-md mx-auto">
             {searchQuery
-              ? 'Try adjusting your search terms'
-              : 'Create your first folder to organize your files'}
+              ? "Try adjusting your search terms"
+              : "Create your first folder to organize your files"}
           </p>
           {!searchQuery && (
             <button
@@ -166,7 +181,7 @@ export const FoldersPage: React.FC = () => {
       ) : (
         <div className="space-y-4">
           {/* Column Headers for List View */}
-          {viewMode === 'list' && (
+          {viewMode === "list" && (
             <div className="flex items-center justify-between px-4 py-2 text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 rounded-lg">
               <div className="flex items-center space-x-3 flex-1 min-w-0">
                 <div className="w-8"></div>
@@ -186,11 +201,13 @@ export const FoldersPage: React.FC = () => {
           )}
 
           {/* Folders */}
-          <div className={
-            viewMode === 'grid'
-              ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6'
-              : 'space-y-1'
-          }>
+          <div
+            className={
+              viewMode === "grid"
+                ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+                : "space-y-1"
+            }
+          >
             {filteredFolders.map((folder) => (
               <FolderCard
                 key={folder.id}

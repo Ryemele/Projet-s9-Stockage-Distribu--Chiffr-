@@ -1,39 +1,52 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Upload, Search, Folder as FolderIcon, FolderPlus } from 'lucide-react';
-import type { EncryptedFile } from '../types';
-import type { Folder } from '../types/folder';
-import { FOLDER_COLORS } from '../types/folder';
-import { CreateFolderModal } from '../components/folders/CreateFolderModal';
-import { Breadcrumb } from '../components/folders/Breadcrumb';
-import { UnifiedFolderTable } from '../components/folders/UnifiedFolderTable';
-import { getFolderById, getSubFolders, getFilesByFolder, addFolder, deleteFolderById, deleteFileById, toggleFileStarred, getExactFileCount, calculateFolderSize, formatSize } from '../mocks';
+import React, { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { Upload, Search, Folder as FolderIcon, FolderPlus } from "lucide-react";
+import type { EncryptedFile } from "../types";
+import type { Folder } from "../types/folder";
+import { FOLDER_COLORS } from "../types/folder";
+import { CreateFolderModal } from "../components/folders/CreateFolderModal";
+import { Breadcrumb } from "../components/folders/Breadcrumb";
+import { UnifiedFolderTable } from "../components/folders/UnifiedFolderTable";
+import {
+  getFolderById,
+  getSubFolders,
+  getFilesByFolder,
+  addFolder,
+  deleteFolderById,
+  deleteFileById,
+  toggleFileStarred,
+  getExactFileCount,
+  calculateFolderSize,
+  formatSize,
+} from "../mocks";
 
 export const FolderDetailPage: React.FC = () => {
   const { folderId } = useParams<{ folderId: string }>();
   const navigate = useNavigate();
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
   const [showCreateFolderModal, setShowCreateFolderModal] = useState(false);
   const [subFolders, setSubFolders] = useState<Folder[]>([]);
   const [files, setFiles] = useState<EncryptedFile[]>([]);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [refreshKey] = useState(0);
 
   // Get folder data from centralized mock data
-  const folder = getFolderById(folderId || '1') || {
-    id: folderId || '1',
-    name: 'Unknown Folder',
-    description: 'Folder description',
-    color: 'blue',
+  const folder = getFolderById(folderId || "1") || {
+    id: folderId || "1",
+    name: "Unknown Folder",
+    description: "Folder description",
+    color: "blue",
     fileCount: 0,
     size: 0,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
 
-  const colorConfig = FOLDER_COLORS[folder.color as keyof typeof FOLDER_COLORS] || FOLDER_COLORS.blue;
+  const colorConfig =
+    FOLDER_COLORS[folder.color as keyof typeof FOLDER_COLORS] ||
+    FOLDER_COLORS.blue;
 
   // Get exact counts and calculated size
-  const currentFolderId = folderId || '1';
+  const currentFolderId = folderId || "1";
   const exactFileCount = getExactFileCount(currentFolderId);
   const folderSize = calculateFolderSize(currentFolderId);
 
@@ -41,50 +54,50 @@ export const FolderDetailPage: React.FC = () => {
   useEffect(() => {
     setSubFolders(getSubFolders(currentFolderId));
     setFiles(getFilesByFolder(currentFolderId));
-    setSearchQuery(''); // Reset search when changing folders
+    setSearchQuery(""); // Reset search when changing folders
   }, [folderId, currentFolderId]);
 
   const handleDeleteFile = (file: EncryptedFile) => {
     deleteFileById(file.id);
-    setFiles(getFilesByFolder(folderId || '1'));
+    setFiles(getFilesByFolder(folderId || "1"));
   };
 
   const handleDownloadFile = (file: EncryptedFile) => {
-    console.log('Download file:', file.id);
+    console.log("Download file:", file.id);
     alert(`Downloading ${file.name}...`);
   };
 
   const handleShareFile = (file: EncryptedFile) => {
-    console.log('Share file:', file.id);
+    console.log("Share file:", file.id);
     alert(`Share ${file.name} with team`);
   };
 
   const handleToggleStar = (file: EncryptedFile) => {
     toggleFileStarred(file.id);
-    setFiles(getFilesByFolder(folderId || '1'));
+    setFiles(getFilesByFolder(folderId || "1"));
   };
 
   const handleUpload = () => {
-    navigate('/upload', { state: { folderId: folder.id } });
+    navigate("/upload", { state: { folderId: folder.id } });
   };
 
   const handleCreateSubFolder = (newFolder: Folder) => {
     addFolder(newFolder);
-    setSubFolders(getSubFolders(folderId || '1'));
+    setSubFolders(getSubFolders(folderId || "1"));
   };
 
   const handleDeleteSubFolder = (subFolderId: string) => {
     deleteFolderById(subFolderId);
-    setSubFolders(getSubFolders(folderId || '1'));
+    setSubFolders(getSubFolders(folderId || "1"));
   };
 
   const handleEditSubFolder = (subFolder: Folder) => {
-    console.log('Edit subfolder:', subFolder);
+    console.log("Edit subfolder:", subFolder);
   };
 
   // Breadcrumb items
   const breadcrumbItems = [
-    { id: folder.id!, name: folder.name, path: `/folder/${folder.id}` }
+    { id: folder.id!, name: folder.name, path: `/folder/${folder.id}` },
   ];
 
   return (
@@ -93,7 +106,9 @@ export const FolderDetailPage: React.FC = () => {
       <Breadcrumb items={breadcrumbItems} />
 
       {/* Header */}
-      <div className={`flex items-center gap-4 bg-gradient-to-r ${colorConfig.gradient} rounded-xl p-6 text-white shadow-lg`}>
+      <div
+        className={`flex items-center gap-4 bg-gradient-to-r ${colorConfig.gradient} rounded-xl p-6 text-white shadow-lg`}
+      >
         <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center">
           <FolderIcon className="h-8 w-8 text-white" />
         </div>
@@ -143,7 +158,7 @@ export const FolderDetailPage: React.FC = () => {
       {/* Unified Folder and File Table */}
       <UnifiedFolderTable
         key={refreshKey}
-        folderId={folderId || '1'}
+        folderId={folderId || "1"}
         folders={subFolders}
         files={files}
         onDeleteFolder={handleDeleteSubFolder}

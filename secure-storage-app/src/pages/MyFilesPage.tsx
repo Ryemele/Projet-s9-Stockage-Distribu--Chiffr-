@@ -22,7 +22,7 @@ export const MyFilesPage: React.FC = () => {
 
     // Apply filter
     switch (activeFilter) {
-      case 'recent':
+      case 'recent': {
         // Files uploaded in the last 7 days
         const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -30,6 +30,7 @@ export const MyFilesPage: React.FC = () => {
           (file) => new Date(file.uploadedAt) >= sevenDaysAgo
         );
         break;
+      }
       case 'starred':
         filtered = allFiles.filter((file) => file.starred === true);
         break;
@@ -89,11 +90,11 @@ export const MyFilesPage: React.FC = () => {
   const getFilterCount = (filterType: FilterType): number => {
     switch (filterType) {
       case 'all':
-        return allFiles.length;
-      case 'recent':
+      case 'recent': {
         const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
         return allFiles.filter((file) => new Date(file.uploadedAt) >= sevenDaysAgo).length;
+      }
       case 'starred':
         return allFiles.filter((file) => file.starred === true).length;
       case 'documents':

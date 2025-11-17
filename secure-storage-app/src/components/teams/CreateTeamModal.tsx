@@ -1,16 +1,19 @@
-import React, { useState } from 'react';
-import { X, Users, FileText, Shield, Check } from 'lucide-react';
-import type { Team, TeamSettings } from '../../types/teams';
+import React, { useState } from "react";
+import { X, Users, FileText, Check } from "lucide-react";
+import type { Team, TeamSettings } from "../../types/teams";
 
 interface CreateTeamModalProps {
   onClose: () => void;
   onCreate: (team: Team) => void;
 }
 
-export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({ onClose, onCreate }) => {
+export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
+  onClose,
+  onCreate,
+}) => {
   const [step, setStep] = useState(1);
-  const [teamName, setTeamName] = useState('');
-  const [teamDescription, setTeamDescription] = useState('');
+  const [teamName, setTeamName] = useState("");
+  const [teamDescription, setTeamDescription] = useState("");
   const [settings, setSettings] = useState<TeamSettings>({
     allowMemberInvites: true,
     allowFileSharing: true,
@@ -25,19 +28,20 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({ onClose, onCre
       id: Date.now().toString(),
       name: teamName.trim(),
       description: teamDescription.trim(),
-      createdBy: 'current-user-id',
+      createdBy: "current-user-id",
       createdAt: new Date().toISOString(),
       sharedFiles: 0,
       members: [
         {
-          id: 'current-user-id',
-          email: 'admin@example.com',
-          name: 'Admin User',
-          role: 'admin',
+          id: "current-user-id",
+          email: "admin@example.com",
+          name: "Admin User",
+          role: "admin",
           joinedAt: new Date().toISOString(),
         },
       ],
       settings,
+      memberCount: 1,
     };
 
     onCreate(newTeam);
@@ -73,7 +77,7 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({ onClose, onCre
             <div>
               <h2 className="text-2xl font-bold text-white">Create New Team</h2>
               <p className="text-blue-100 mt-1">
-                Set up your team in {step === 1 ? '2' : '1'} simple steps
+                Set up your team in {step === 1 ? "2" : "1"} simple steps
               </p>
             </div>
           </div>
@@ -81,19 +85,31 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({ onClose, onCre
           {/* Progress Steps */}
           <div className="flex items-center gap-4 mt-6">
             <div className="flex items-center gap-2 flex-1">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all ${
-                step >= 1 ? 'bg-white text-primary-600' : 'bg-white/20 text-white/60'
-              }`}>
-                {step > 1 ? <Check className="h-4 w-4" /> : '1'}
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all ${
+                  step >= 1
+                    ? "bg-white text-primary-600"
+                    : "bg-white/20 text-white/60"
+                }`}
+              >
+                {step > 1 ? <Check className="h-4 w-4" /> : "1"}
               </div>
               <div className="flex-1 h-1 bg-white/20 rounded-full overflow-hidden">
-                <div className={`h-full bg-white transition-all duration-300 ${step >= 1 ? 'w-full' : 'w-0'}`} />
+                <div
+                  className={`h-full bg-white transition-all duration-300 ${
+                    step >= 1 ? "w-full" : "w-0"
+                  }`}
+                />
               </div>
             </div>
             <div className="flex items-center gap-2 flex-1">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all ${
-                step >= 2 ? 'bg-white text-primary-600' : 'bg-white/20 text-white/60'
-              }`}>
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all ${
+                  step >= 2
+                    ? "bg-white text-primary-600"
+                    : "bg-white/20 text-white/60"
+                }`}
+              >
                 2
               </div>
             </div>
@@ -135,7 +151,9 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({ onClose, onCre
                 <div className="flex items-start gap-3">
                   <FileText className="h-5 w-5 text-primary-600 mt-0.5 flex-shrink-0" />
                   <div className="text-sm text-gray-700">
-                    <p className="font-medium text-gray-900 mb-1">Team Benefits</p>
+                    <p className="font-medium text-gray-900 mb-1">
+                      Team Benefits
+                    </p>
                     <ul className="space-y-1 text-gray-600">
                       <li>• Share files securely with team members</li>
                       <li>• Manage access with role-based permissions</li>
@@ -156,19 +174,32 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({ onClose, onCre
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-900">Member invites</p>
-                      <p className="text-xs text-gray-500 mt-0.5">Allow members to invite new people</p>
+                      <p className="text-sm font-medium text-gray-900">
+                        Member invites
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Allow members to invite new people
+                      </p>
                     </div>
                     <button
                       type="button"
-                      onClick={() => setSettings({ ...settings, allowMemberInvites: !settings.allowMemberInvites })}
+                      onClick={() =>
+                        setSettings({
+                          ...settings,
+                          allowMemberInvites: !settings.allowMemberInvites,
+                        })
+                      }
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${
-                        settings.allowMemberInvites ? 'bg-primary-600' : 'bg-gray-200'
+                        settings.allowMemberInvites
+                          ? "bg-primary-600"
+                          : "bg-gray-200"
                       }`}
                     >
                       <span
                         className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          settings.allowMemberInvites ? 'translate-x-6' : 'translate-x-1'
+                          settings.allowMemberInvites
+                            ? "translate-x-6"
+                            : "translate-x-1"
                         }`}
                       />
                     </button>
@@ -176,19 +207,32 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({ onClose, onCre
 
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-900">File sharing</p>
-                      <p className="text-xs text-gray-500 mt-0.5">Allow members to share files with the team</p>
+                      <p className="text-sm font-medium text-gray-900">
+                        File sharing
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Allow members to share files with the team
+                      </p>
                     </div>
                     <button
                       type="button"
-                      onClick={() => setSettings({ ...settings, allowFileSharing: !settings.allowFileSharing })}
+                      onClick={() =>
+                        setSettings({
+                          ...settings,
+                          allowFileSharing: !settings.allowFileSharing,
+                        })
+                      }
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${
-                        settings.allowFileSharing ? 'bg-primary-600' : 'bg-gray-200'
+                        settings.allowFileSharing
+                          ? "bg-primary-600"
+                          : "bg-gray-200"
                       }`}
                     >
                       <span
                         className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          settings.allowFileSharing ? 'translate-x-6' : 'translate-x-1'
+                          settings.allowFileSharing
+                            ? "translate-x-6"
+                            : "translate-x-1"
                         }`}
                       />
                     </button>
@@ -196,19 +240,32 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({ onClose, onCre
 
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-900">Require approval</p>
-                      <p className="text-xs text-gray-500 mt-0.5">Admin must approve new member requests</p>
+                      <p className="text-sm font-medium text-gray-900">
+                        Require approval
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Admin must approve new member requests
+                      </p>
                     </div>
                     <button
                       type="button"
-                      onClick={() => setSettings({ ...settings, requireApproval: !settings.requireApproval })}
+                      onClick={() =>
+                        setSettings({
+                          ...settings,
+                          requireApproval: !settings.requireApproval,
+                        })
+                      }
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${
-                        settings.requireApproval ? 'bg-primary-600' : 'bg-gray-200'
+                        settings.requireApproval
+                          ? "bg-primary-600"
+                          : "bg-gray-200"
                       }`}
                     >
                       <span
                         className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          settings.requireApproval ? 'translate-x-6' : 'translate-x-1'
+                          settings.requireApproval
+                            ? "translate-x-6"
+                            : "translate-x-1"
                         }`}
                       />
                     </button>
@@ -225,7 +282,7 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({ onClose, onCre
             onClick={step === 1 ? onClose : prevStep}
             className="px-6 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-white transition-colors font-medium"
           >
-            {step === 1 ? 'Cancel' : 'Back'}
+            {step === 1 ? "Cancel" : "Back"}
           </button>
 
           {step === 1 ? (

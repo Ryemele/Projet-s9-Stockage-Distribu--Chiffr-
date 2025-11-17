@@ -4,7 +4,6 @@ import {
   Trash2,
   Share2,
   FileIcon as File,
-  Loader2,
   Lock,
   Calendar,
   User,
@@ -45,7 +44,6 @@ export const FileTable: React.FC<FileTableProps> = ({
   files,
   loading = false,
   error = null,
-  showStats = true,
   showSearch = false,
   showUploadButton = false,
   canUpload = true,
@@ -56,7 +54,6 @@ export const FileTable: React.FC<FileTableProps> = ({
   onUpload,
   onToggleStar,
   downloadingId = null,
-  downloadProgress = 0,
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -182,9 +179,7 @@ export const FileTable: React.FC<FileTableProps> = ({
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Uploaded
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
+
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
                   </th>
@@ -206,7 +201,11 @@ export const FileTable: React.FC<FileTableProps> = ({
                             <button
                               onClick={() => onToggleStar(file)}
                               className="flex-shrink-0 p-1 hover:bg-gray-100 rounded transition-colors"
-                              title={file.starred ? "Remove from favorites" : "Add to favorites"}
+                              title={
+                                file.starred
+                                  ? "Remove from favorites"
+                                  : "Add to favorites"
+                              }
                             >
                               <Star
                                 className={`h-5 w-5 transition-colors ${
@@ -260,18 +259,7 @@ export const FileTable: React.FC<FileTableProps> = ({
                           </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
-                        {isDownloading ? (
-                          <div className="flex items-center gap-2">
-                            <Loader2 className="h-4 w-4 text-primary-600 animate-spin" />
-                            <span className="text-sm text-primary-600 font-medium">
-                              {downloadProgress}%
-                            </span>
-                          </div>
-                        ) : (
-                          <span className="text-sm text-gray-400">Ready</span>
-                        )}
-                      </td>
+
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button

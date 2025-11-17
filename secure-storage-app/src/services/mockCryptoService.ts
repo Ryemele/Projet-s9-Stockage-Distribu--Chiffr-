@@ -34,7 +34,7 @@ class MockCryptoService {
    * Generate a mock key pair for a user
    */
   async generateKeyPair(email: string): Promise<MockKeyPair> {
-    console.log('[MockCrypto] Generating mock key pair for:', email);
+    console.log("[MockCrypto] Generating mock key pair for:", email);
 
     // Simulate key generation delay
     await this.delay(500);
@@ -42,7 +42,7 @@ class MockCryptoService {
     return {
       publicKey: `mock_public_key_${email}_${Date.now()}`,
       privateKey: `mock_private_key_${email}_${Date.now()}`,
-      email
+      email,
     };
   }
 
@@ -51,36 +51,36 @@ class MockCryptoService {
    */
   async encryptFile(
     file: File,
-    keyPair: MockKeyPair,
+    _keyPair: MockKeyPair,
     onProgress?: ProgressCallback
   ): Promise<MockFileEnvelope> {
-    console.log('[MockCrypto] Starting mock encryption for:', file.name);
+    console.log("[MockCrypto] Starting mock encryption for:", file.name);
 
-    onProgress?.(10, 'Initializing encryption...');
+    onProgress?.(10, "Initializing encryption...");
     await this.delay(300);
 
-    onProgress?.(30, 'Reading file...');
+    onProgress?.(30, "Reading file...");
     const fileData = await this.fileToArrayBuffer(file);
     await this.delay(300);
 
-    onProgress?.(60, 'Encrypting data...');
+    onProgress?.(60, "Encrypting data...");
     const base64Data = this.arrayBufferToBase64(fileData);
     await this.delay(500);
 
-    onProgress?.(90, 'Finalizing...');
+    onProgress?.(90, "Finalizing...");
     await this.delay(200);
 
     const envelope: MockFileEnvelope = {
       fileId: this.generateFileId(),
       fileName: file.name,
       fileSize: file.size,
-      mimeType: file.type || 'application/octet-stream',
+      mimeType: file.type || "application/octet-stream",
       encryptedData: base64Data,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
 
-    onProgress?.(100, 'Encryption complete!');
-    console.log('[MockCrypto] Encryption complete. File ID:', envelope.fileId);
+    onProgress?.(100, "Encryption complete!");
+    console.log("[MockCrypto] Encryption complete. File ID:", envelope.fileId);
 
     return envelope;
   }
@@ -90,28 +90,31 @@ class MockCryptoService {
    */
   async decryptFile(
     envelope: MockFileEnvelope,
-    keyPair: MockKeyPair,
+    _keyPair: MockKeyPair,
     onProgress?: ProgressCallback
   ): Promise<{ data: ArrayBuffer; fileName: string; mimeType: string }> {
-    console.log('[MockCrypto] Starting mock decryption for:', envelope.fileName);
+    console.log(
+      "[MockCrypto] Starting mock decryption for:",
+      envelope.fileName
+    );
 
-    onProgress?.(10, 'Initializing decryption...');
+    onProgress?.(10, "Initializing decryption...");
     await this.delay(300);
 
-    onProgress?.(40, 'Decrypting data...');
+    onProgress?.(40, "Decrypting data...");
     await this.delay(500);
 
-    onProgress?.(70, 'Verifying integrity...');
+    onProgress?.(70, "Verifying integrity...");
     const data = this.base64ToArrayBuffer(envelope.encryptedData);
     await this.delay(300);
 
-    onProgress?.(100, 'Decryption complete!');
-    console.log('[MockCrypto] Decryption complete');
+    onProgress?.(100, "Decryption complete!");
+    console.log("[MockCrypto] Decryption complete");
 
     return {
       data,
       fileName: envelope.fileName,
-      mimeType: envelope.mimeType
+      mimeType: envelope.mimeType,
     };
   }
 
@@ -136,7 +139,7 @@ class MockCryptoService {
   }
 
   private async delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   private async fileToArrayBuffer(file: File): Promise<ArrayBuffer> {
@@ -150,7 +153,7 @@ class MockCryptoService {
 
   private arrayBufferToBase64(buffer: ArrayBuffer): string {
     const bytes = new Uint8Array(buffer);
-    let binary = '';
+    let binary = "";
     for (let i = 0; i < bytes.length; i++) {
       binary += String.fromCharCode(bytes[i]);
     }

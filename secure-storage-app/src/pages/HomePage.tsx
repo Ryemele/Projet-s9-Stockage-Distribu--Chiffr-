@@ -1,13 +1,20 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Upload, Folder as FolderIcon, FileIcon, Plus } from 'lucide-react';
-import type { Folder } from '../types/folder';
-import type { EncryptedFile } from '../types';
-import { FOLDER_COLORS } from '../types/folder';
-import { FolderCard } from '../components/folders/FolderCard';
-import { CreateFolderModal } from '../components/folders/CreateFolderModal';
-import { FileTable } from '../components/files/FileTable';
-import { getRootFolders, getAllFiles, addFolder, calculateTotalStorage, formatSize, toggleFileStarred, deleteFileById } from '../mocks';
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Upload, Folder as FolderIcon, FileIcon, Plus } from "lucide-react";
+import type { Folder } from "../types/folder";
+import type { EncryptedFile } from "../types";
+import { FolderCard } from "../components/folders/FolderCard";
+import { CreateFolderModal } from "../components/folders/CreateFolderModal";
+import { FileTable } from "../components/files/FileTable";
+import {
+  getRootFolders,
+  getAllFiles,
+  addFolder,
+  calculateTotalStorage,
+  formatSize,
+  toggleFileStarred,
+  deleteFileById,
+} from "../mocks";
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
@@ -20,7 +27,10 @@ export const HomePage: React.FC = () => {
 
   // Get recent files (last 5 files)
   const recentFiles: EncryptedFile[] = getAllFiles()
-    .sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())
+    .sort(
+      (a, b) =>
+        new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+    )
     .slice(0, 5);
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -37,7 +47,7 @@ export const HomePage: React.FC = () => {
     e.preventDefault();
     setIsDragging(false);
     // Handle file upload
-    navigate('/upload');
+    navigate("/upload");
   };
 
   const handleCreateFolder = (folder: Folder) => {
@@ -46,31 +56,31 @@ export const HomePage: React.FC = () => {
   };
 
   const handleDeleteFolder = (folderId: string) => {
-    setFolders(folders.filter(f => f.id !== folderId));
+    setFolders(folders.filter((f) => f.id !== folderId));
   };
 
   const handleEditFolder = (folder: Folder) => {
-    console.log('Edit folder:', folder);
+    console.log("Edit folder:", folder);
   };
 
   const handleDeleteFile = (file: EncryptedFile) => {
     deleteFileById(file.id);
-    setRefreshKey(prev => prev + 1);
+    setRefreshKey((prev) => prev + 1);
   };
 
   const handleDownloadFile = (file: EncryptedFile) => {
-    console.log('Download file:', file.id);
+    console.log("Download file:", file.id);
     alert(`Downloading ${file.name}...`);
   };
 
   const handleShareFile = (file: EncryptedFile) => {
-    console.log('Share file:', file.id);
+    console.log("Share file:", file.id);
     alert(`Share ${file.name} with team`);
   };
 
   const handleToggleStar = (file: EncryptedFile) => {
     toggleFileStarred(file.id);
-    setRefreshKey(prev => prev + 1);
+    setRefreshKey((prev) => prev + 1);
   };
 
   return (
@@ -82,25 +92,25 @@ export const HomePage: React.FC = () => {
         onDrop={handleDrop}
         className={`relative overflow-hidden rounded-2xl transition-all duration-300 ${
           isDragging
-            ? 'bg-primary-50 border-2 border-primary-400 border-dashed'
-            : 'bg-gradient-to-br from-primary-600 via-primary-500 to-secondary-400'
+            ? "bg-primary-50 border-2 border-primary-400 border-dashed"
+            : "bg-gradient-to-br from-primary-600 via-primary-500 to-secondary-400"
         }`}
       >
         <div className="relative z-10 px-8 py-12">
           <div className="max-w-3xl">
             <h1 className="text-4xl font-bold text-white mb-3">
-              {isDragging ? 'Drop files to upload' : 'Welcome to VaultFlow'}
+              {isDragging ? "Drop files to upload" : "Welcome to SecureBox !"}
             </h1>
             <p className="text-white/90 text-lg mb-8">
               {isDragging
-                ? 'Release to start uploading your files securely'
-                : 'Your secure, encrypted file storage solution'}
+                ? "Release to start uploading your files securely"
+                : "Your secure, encrypted file storage solution"}
             </p>
 
             {!isDragging && (
               <div className="flex items-center gap-4">
                 <button
-                  onClick={() => navigate('/upload')}
+                  onClick={() => navigate("/upload")}
                   className="px-6 py-3 bg-white text-primary-600 font-semibold rounded-lg hover:bg-white/90 transition-all shadow-lg hover:shadow-xl flex items-center gap-2"
                 >
                   <Upload className="h-5 w-5" />
@@ -132,7 +142,9 @@ export const HomePage: React.FC = () => {
             </div>
             <div>
               <p className="text-sm text-gray-600">Total Folders</p>
-              <p className="text-2xl font-bold text-gray-900">{folders.length}</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {folders.length}
+              </p>
             </div>
           </div>
         </div>
@@ -174,7 +186,7 @@ export const HomePage: React.FC = () => {
             <p className="text-sm text-gray-600 mt-1">Organize your files</p>
           </div>
           <button
-            onClick={() => navigate('/folders')}
+            onClick={() => navigate("/folders")}
             className="text-sm text-primary-600 hover:text-primary-700 font-medium"
           >
             View all →
@@ -201,7 +213,7 @@ export const HomePage: React.FC = () => {
             <p className="text-sm text-gray-600 mt-1">Your latest uploads</p>
           </div>
           <button
-            onClick={() => navigate('/files')}
+            onClick={() => navigate("/files")}
             className="text-sm text-primary-600 hover:text-primary-700 font-medium"
           >
             View all →

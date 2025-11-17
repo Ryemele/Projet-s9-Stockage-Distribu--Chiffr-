@@ -1,9 +1,12 @@
-import React, { useState, useRef } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
-import { mockCryptoService, type MockFileEnvelope } from '../../services/mockCryptoService';
-import { apiService } from '../../services/apiService';
-import { Button, Alert } from '../ui';
-import { Upload, File, X, Lock, Shield } from 'lucide-react';
+import React, { useState, useRef } from "react";
+import { useAuth } from "../../contexts/AuthContext";
+import {
+  mockCryptoService,
+  type MockFileEnvelope,
+} from "../../services/mockCryptoService";
+import { apiService } from "../../services/apiService";
+import { Alert } from "../ui";
+import { Upload, File, X, Shield } from "lucide-react";
 
 /**
  * Enhanced File Upload Component
@@ -17,21 +20,23 @@ import { Upload, File, X, Lock, Shield } from 'lucide-react';
 
 interface UploadingFile {
   file: File;
-  status: 'pending' | 'encrypting' | 'uploading' | 'completed' | 'error';
+  status: "pending" | "encrypting" | "uploading" | "completed" | "error";
   progress: number;
   statusMessage: string;
   error?: string;
   envelope?: MockFileEnvelope;
 }
 
-export const FileUploadEnhanced: React.FC<{ onUploadComplete?: () => void }> = ({
-  onUploadComplete
-}) => {
+export const FileUploadEnhanced: React.FC<{
+  onUploadComplete?: () => void;
+}> = ({ onUploadComplete }) => {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [uploadingFiles, setUploadingFiles] = useState<Map<string, UploadingFile>>(new Map());
+  const [uploadingFiles, setUploadingFiles] = useState<
+    Map<string, UploadingFile>
+  >(new Map());
   const [isUploading, setIsUploading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { masterKey, keyPair } = useAuth();
@@ -40,17 +45,17 @@ export const FileUploadEnhanced: React.FC<{ onUploadComplete?: () => void }> = (
     if (e.target.files) {
       const files = Array.from(e.target.files);
       setSelectedFiles(files);
-      setError('');
-      setSuccess('');
+      setError("");
+      setSuccess("");
 
       // Initialize upload status for each file
       const newMap = new Map<string, UploadingFile>();
-      files.forEach(file => {
+      files.forEach((file) => {
         newMap.set(file.name, {
           file,
-          status: 'pending',
+          status: "pending",
           progress: 0,
-          statusMessage: 'Waiting...'
+          statusMessage: "Waiting...",
         });
       });
       setUploadingFiles(newMap);
@@ -58,8 +63,8 @@ export const FileUploadEnhanced: React.FC<{ onUploadComplete?: () => void }> = (
   };
 
   const removeFile = (fileName: string) => {
-    setSelectedFiles(prev => prev.filter(f => f.name !== fileName));
-    setUploadingFiles(prev => {
+    setSelectedFiles((prev) => prev.filter((f) => f.name !== fileName));
+    setUploadingFiles((prev) => {
       const newMap = new Map(prev);
       newMap.delete(fileName);
       return newMap;
@@ -70,7 +75,7 @@ export const FileUploadEnhanced: React.FC<{ onUploadComplete?: () => void }> = (
     fileName: string,
     updates: Partial<UploadingFile>
   ) => {
-    setUploadingFiles(prev => {
+    setUploadingFiles((prev) => {
       const newMap = new Map(prev);
       const current = newMap.get(fileName);
       if (current) {
@@ -82,18 +87,18 @@ export const FileUploadEnhanced: React.FC<{ onUploadComplete?: () => void }> = (
 
   const handleUpload = async () => {
     if (!masterKey || !keyPair) {
-      setError('Keys not available. Please log in again.');
+      setError("Keys not available. Please log in again.");
       return;
     }
 
     if (selectedFiles.length === 0) {
-      setError('Please select at least one file');
+      setError("Please select at least one file");
       return;
     }
 
     setIsUploading(true);
-    setError('');
-    setSuccess('');
+    setError("");
+    setSuccess("");
 
     try {
       // Upload files sequentially
@@ -102,9 +107,9 @@ export const FileUploadEnhanced: React.FC<{ onUploadComplete?: () => void }> = (
           console.log(`[Upload] Starting encryption for: ${file.name}`);
 
           updateFileStatus(file.name, {
-            status: 'encrypting',
-            statusMessage: 'Starting encryption...',
-            progress: 0
+            status: "encrypting",
+            statusMessage: "Starting encryption...",
+            progress: 0,
           });
 
           // Encrypt file with mock service
@@ -113,20 +118,22 @@ export const FileUploadEnhanced: React.FC<{ onUploadComplete?: () => void }> = (
             keyPair,
             (progress, status) => {
               updateFileStatus(file.name, {
-                status: 'encrypting',
+                status: "encrypting",
                 progress,
-                statusMessage: status
+                statusMessage: status,
               });
             }
           );
 
-          console.log(`[Upload] Encryption complete. File ID: ${envelope.fileId}`);
+          console.log(
+            `[Upload] Encryption complete. File ID: ${envelope.fileId}`
+          );
 
           updateFileStatus(file.name, {
-            status: 'uploading',
-            statusMessage: 'Uploading to server...',
+            status: "uploading",
+            statusMessage: "Uploading to server...",
             progress: 95,
-            envelope
+            envelope,
           });
 
           // Convert envelope for API (simplified)
@@ -136,7 +143,7 @@ export const FileUploadEnhanced: React.FC<{ onUploadComplete?: () => void }> = (
             fileSize: envelope.fileSize,
             mimeType: envelope.mimeType,
             encryptedData: envelope.encryptedData,
-            timestamp: envelope.timestamp
+            timestamp: envelope.timestamp,
           };
 
           // Upload to server
@@ -145,17 +152,17 @@ export const FileUploadEnhanced: React.FC<{ onUploadComplete?: () => void }> = (
           console.log(`[Upload] Upload complete for: ${file.name}`);
 
           updateFileStatus(file.name, {
-            status: 'completed',
-            statusMessage: 'Upload complete!',
-            progress: 100
+            status: "completed",
+            statusMessage: "Upload complete!",
+            progress: 100,
           });
-
         } catch (fileError) {
           console.error(`[Upload] Error for ${file.name}:`, fileError);
           updateFileStatus(file.name, {
-            status: 'error',
-            statusMessage: 'Upload failed',
-            error: fileError instanceof Error ? fileError.message : 'Unknown error'
+            status: "error",
+            statusMessage: "Upload failed",
+            error:
+              fileError instanceof Error ? fileError.message : "Unknown error",
           });
         }
       }
@@ -166,34 +173,33 @@ export const FileUploadEnhanced: React.FC<{ onUploadComplete?: () => void }> = (
       if (onUploadComplete) {
         onUploadComplete();
       }
-
     } catch (err) {
-      console.error('[Upload] General error:', err);
-      setError(err instanceof Error ? err.message : 'Upload failed');
+      console.error("[Upload] General error:", err);
+      setError(err instanceof Error ? err.message : "Upload failed");
     } finally {
       setIsUploading(false);
     }
   };
 
   const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return '0 Bytes';
+    if (bytes === 0) return "0 Bytes";
     const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const sizes = ["Bytes", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
   };
 
-  const getStatusColor = (status: UploadingFile['status']) => {
+  const getStatusColor = (status: UploadingFile["status"]) => {
     switch (status) {
-      case 'completed':
-        return 'text-green-600';
-      case 'error':
-        return 'text-red-600';
-      case 'encrypting':
-      case 'uploading':
-        return 'text-primary-600';
+      case "completed":
+        return "text-green-600";
+      case "error":
+        return "text-red-600";
+      case "encrypting":
+      case "uploading":
+        return "text-primary-600";
       default:
-        return 'text-gray-600';
+        return "text-gray-600";
     }
   };
 
@@ -231,7 +237,7 @@ export const FileUploadEnhanced: React.FC<{ onUploadComplete?: () => void }> = (
           Drop files here to upload
         </h3>
         <p className="text-sm text-gray-600 mb-4">
-          or{' '}
+          or{" "}
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
@@ -251,7 +257,8 @@ export const FileUploadEnhanced: React.FC<{ onUploadComplete?: () => void }> = (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-medium text-gray-700">
-              {uploadingFiles.size} {uploadingFiles.size === 1 ? 'file' : 'files'} selected
+              {uploadingFiles.size}{" "}
+              {uploadingFiles.size === 1 ? "file" : "files"} selected
             </h3>
           </div>
 
@@ -274,13 +281,18 @@ export const FileUploadEnhanced: React.FC<{ onUploadComplete?: () => void }> = (
                     </p>
 
                     {/* Status */}
-                    <p className={`text-xs mt-2 font-medium ${getStatusColor(uploadFile.status)}`}>
+                    <p
+                      className={`text-xs mt-2 font-medium ${getStatusColor(
+                        uploadFile.status
+                      )}`}
+                    >
                       {uploadFile.statusMessage}
                       {uploadFile.error && ` - ${uploadFile.error}`}
                     </p>
 
                     {/* Progress Bar */}
-                    {(uploadFile.status === 'encrypting' || uploadFile.status === 'uploading') && (
+                    {(uploadFile.status === "encrypting" ||
+                      uploadFile.status === "uploading") && (
                       <div className="mt-2">
                         <div className="w-full bg-gray-200 rounded-full h-1.5">
                           <div
@@ -288,13 +300,15 @@ export const FileUploadEnhanced: React.FC<{ onUploadComplete?: () => void }> = (
                             style={{ width: `${uploadFile.progress}%` }}
                           />
                         </div>
-                        <p className="text-xs text-gray-500 mt-1.5">{uploadFile.progress}%</p>
+                        <p className="text-xs text-gray-500 mt-1.5">
+                          {uploadFile.progress}%
+                        </p>
                       </div>
                     )}
                   </div>
                 </div>
 
-                {uploadFile.status === 'pending' && (
+                {uploadFile.status === "pending" && (
                   <button
                     onClick={() => removeFile(uploadFile.file.name)}
                     className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded-lg transition-colors"
@@ -316,14 +330,17 @@ export const FileUploadEnhanced: React.FC<{ onUploadComplete?: () => void }> = (
       {selectedFiles.length > 0 && (
         <div className="flex items-center justify-between pt-4 border-t border-gray-200">
           <p className="text-sm text-gray-600">
-            {selectedFiles.length} {selectedFiles.length === 1 ? 'file' : 'files'} ready to upload
+            {selectedFiles.length}{" "}
+            {selectedFiles.length === 1 ? "file" : "files"} ready to upload
           </p>
           <button
             onClick={handleUpload}
             disabled={isUploading}
             className="px-6 py-2.5 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm hover:shadow-md"
           >
-            {isUploading ? 'Uploading...' : `Upload ${selectedFiles.length === 1 ? 'File' : 'Files'}`}
+            {isUploading
+              ? "Uploading..."
+              : `Upload ${selectedFiles.length === 1 ? "File" : "Files"}`}
           </button>
         </div>
       )}

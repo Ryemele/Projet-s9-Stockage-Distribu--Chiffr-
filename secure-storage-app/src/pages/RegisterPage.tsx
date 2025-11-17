@@ -25,7 +25,7 @@ export const RegisterPage: React.FC = () => {
           </div>
           <h1 className="text-4xl font-bold mb-3">
             <span className="bg-gradient-to-r from-primary-600 to-secondary-400 bg-clip-text text-transparent">
-              Vault<span className="font-normal">Flow</span>
+              Secure<span className="font-normal">Box</span>
             </span>
           </h1>
           <p className="text-gray-600 text-lg">

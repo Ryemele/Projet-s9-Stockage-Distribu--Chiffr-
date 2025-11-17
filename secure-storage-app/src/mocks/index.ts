@@ -1,11 +1,11 @@
 // Central export point for all mock data
-export * from './folders';
-export * from './files';
-export * from './teams';
+export * from "./folders";
+export * from "./files";
+export * from "./teams";
 
 // Helper functions to get exact counts
-import { getFilesByFolder, getAllFiles } from './files';
-import { getSubFolders, getAllFolders } from './folders';
+import { getFilesByFolder, getAllFiles } from "./files";
+import { getSubFolders } from "./folders";
 
 export const getExactFileCount = (folderId: string): number => {
   return getFilesByFolder(folderId).length;
@@ -38,15 +38,15 @@ export const calculateTotalStorage = (): number => {
 
 // Format size helper
 export const formatSize = (bytes: number): string => {
-  if (bytes === 0) return '0 B';
-  if (bytes < 1024) return bytes + ' B';
-  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
-  if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + ' MB';
-  return (bytes / 1073741824).toFixed(2) + ' GB';
+  if (bytes === 0) return "0 B";
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + " KB";
+  if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + " MB";
+  return (bytes / 1073741824).toFixed(2) + " GB";
 };
 
 // Get exact file count for a team
 export const getTeamFileCount = (teamId: string): number => {
   const allFiles = getAllFiles();
-  return allFiles.filter(file => file.teamId === teamId).length;
+  return allFiles.filter((file) => file.teamId === teamId).length;
 };

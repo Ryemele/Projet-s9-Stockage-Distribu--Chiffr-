@@ -176,7 +176,7 @@ export const EditTeamModal: React.FC<EditTeamModalProps> = ({ team, onClose, onS
 
         {/* Footer */}
         <div className="border-t border-gray-200 px-8 py-4 bg-gray-50 flex items-center justify-end gap-3">
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
           <Button onClick={handleSubmit} className="flex items-center gap-2">
