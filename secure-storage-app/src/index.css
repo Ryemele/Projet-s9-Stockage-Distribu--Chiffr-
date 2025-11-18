@@ -4,7 +4,7 @@
 
 @layer base {
   body {
-    @apply bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 text-gray-900 min-h-screen;
+    @apply bg-gradient-to-br from-slate-50 via-primary-50 to-secondary-50 text-gray-900 min-h-screen;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   }
 
@@ -19,7 +19,7 @@
 
 @layer components {
   .btn-primary {
-    @apply bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-2.5 rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 font-medium shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 hover:-translate-y-0.5;
+    @apply bg-gradient-to-r from-primary-600 to-secondary-400 text-white px-6 py-2.5 rounded-xl hover:from-primary-700 hover:to-secondary-500 transition-all duration-200 font-medium shadow-lg shadow-primary-500/30 hover:shadow-xl hover:shadow-primary-500/40 hover:-translate-y-0.5;
   }
 
   .btn-secondary {
@@ -27,7 +27,7 @@
   }
 
   .input-field {
-    @apply w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200 bg-white/80 backdrop-blur-sm;
+    @apply w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all duration-200 bg-white/80 backdrop-blur-sm;
   }
 
   .card {
@@ -39,7 +39,7 @@
   }
 
   .gradient-text {
-    @apply bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent;
+    @apply bg-gradient-to-r from-primary-600 to-secondary-400 bg-clip-text text-transparent;
   }
 }
 

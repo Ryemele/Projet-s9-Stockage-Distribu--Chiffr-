@@ -28,8 +28,8 @@ export const Alert: React.FC<AlertProps> = ({
       icon: <AlertCircle className="h-5 w-5 text-yellow-600" />,
     },
     info: {
-      container: 'bg-blue-50 border-blue-200 text-blue-800',
-      icon: <Info className="h-5 w-5 text-blue-600" />,
+      container: 'bg-primary-50 border-blue-200 text-blue-800',
+      icon: <Info className="h-5 w-5 text-primary-600" />,
     },
   };
 

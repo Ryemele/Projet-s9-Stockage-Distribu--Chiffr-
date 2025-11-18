@@ -167,6 +167,9 @@ export interface AFGHFileEnvelope {
   /** IV pour le wrapping AES-GCM de K_file */
   wrapKeyIV: string; // Base64
 
+  /** Salt PBKDF2 pour dériver K_sym depuis S */
+  kdfSalt?: Uint8Array; // 16 bytes
+
   // === DEM: Chiffrement des données ===
 
   /** Chunks chiffrés avec AES-GCM */

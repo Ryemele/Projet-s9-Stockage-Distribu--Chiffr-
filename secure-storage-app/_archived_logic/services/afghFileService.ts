@@ -140,6 +140,7 @@ class AFGHFileService {
         kemCiphertext: kemCiphertext,
         wrappedFileKey: wrappedFileKey,
         wrapKeyIV: wrapKeyIVBase64,
+        kdfSalt: salt, // Store salt for decryption
         chunks: chunks,
         metadata: {
           ownerId: ownerKeyPair.userId,
@@ -202,7 +203,7 @@ class AFGHFileService {
       progressCallback?.(20, "Unwrapping file key...");
 
       const wrapKeyIV = this.base64ToUint8Array(envelope.wrapKeyIV);
-      const salt = new Uint8Array(this.PBKDF2_SALT_LENGTH); // Salt devrait être stocké
+      const salt = envelope.kdfSalt || new Uint8Array(this.PBKDF2_SALT_LENGTH);
       const K_sym = await this.deriveKeyFromSecret(secret_S, salt);
 
       const wrappedFileKeyBuffer = this.base64ToArrayBuffer(
@@ -365,7 +366,7 @@ class AFGHFileService {
       progressCallback?.(20, "Unwrapping file key...");
 
       const wrapKeyIV = this.base64ToUint8Array(sharedEnvelope.wrapKeyIV);
-      const salt = new Uint8Array(this.PBKDF2_SALT_LENGTH);
+      const salt = sharedEnvelope.kdfSalt || new Uint8Array(this.PBKDF2_SALT_LENGTH);
       const K_sym = await this.deriveKeyFromSecret(secret_S, salt);
 
       const wrappedFileKeyBuffer = this.base64ToArrayBuffer(
@@ -612,10 +613,12 @@ class AFGHFileService {
   }
 
   private uint8ArrayToBase64(array: Uint8Array): string {
-    return this.arrayBufferToBase64(
-      // @ts-ignore - ArrayBuffer type compatibility issue
-      array.buffer.slice(array.byteOffset, array.byteOffset + array.byteLength)
-    );
+    // Convert directly without using buffer.slice
+    let binary = "";
+    for (let i = 0; i < array.length; i++) {
+      binary += String.fromCharCode(array[i]);
+    }
+    return btoa(binary);
   }
 
   private base64ToUint8Array(base64: string): Uint8Array {
@@ -633,6 +636,69 @@ class AFGHFileService {
     }
 
     return result.buffer;
+  }
+
+  /**
+   * ========================================
+   * 8. UTILITAIRES - SERIALIZATION
+   * ========================================
+   */
+
+  /**
+   * Sérialise une enveloppe AFGH pour le stockage
+   * Convertit tous les Uint8Array en base64
+   */
+  serializeEnvelope(envelope: AFGHFileEnvelope): string {
+    // Explicitly construct the serialized object to avoid issues with spread operator
+    const serialized = {
+      fileId: envelope.fileId,
+      fileName: envelope.fileName,
+      fileSize: envelope.fileSize,
+      mimeType: envelope.mimeType,
+      kemCiphertext: {
+        U: this.uint8ArrayToBase64(envelope.kemCiphertext.U),
+        V: this.uint8ArrayToBase64(envelope.kemCiphertext.V),
+        level: envelope.kemCiphertext.level,
+      },
+      wrappedFileKey: envelope.wrappedFileKey,
+      wrapKeyIV: envelope.wrapKeyIV,
+      kdfSalt: envelope.kdfSalt
+        ? this.uint8ArrayToBase64(envelope.kdfSalt)
+        : undefined,
+      chunks: envelope.chunks,
+      metadata: envelope.metadata,
+    };
+
+    return JSON.stringify(serialized);
+  }
+
+  /**
+   * Désérialise une enveloppe AFGH depuis le stockage
+   * Convertit tous les base64 en Uint8Array
+   */
+  deserializeEnvelope(serialized: string): AFGHFileEnvelope {
+    const parsed = JSON.parse(serialized);
+
+    console.log('[AFGH File] Deserializing envelope, kemCiphertext.U type:', typeof parsed.kemCiphertext.U);
+    console.log('[AFGH File] kemCiphertext.U value (first 20 chars):', parsed.kemCiphertext.U?.substring?.(0, 20));
+
+    const U = this.base64ToUint8Array(parsed.kemCiphertext.U);
+    const V = this.base64ToUint8Array(parsed.kemCiphertext.V);
+
+    console.log('[AFGH File] Deserialized U:', U.length, 'bytes, is Uint8Array:', U instanceof Uint8Array);
+    console.log('[AFGH File] Deserialized V:', V.length, 'bytes, is Uint8Array:', V instanceof Uint8Array);
+
+    return {
+      ...parsed,
+      kemCiphertext: {
+        U,
+        V,
+        level: parsed.kemCiphertext.level,
+      },
+      kdfSalt: parsed.kdfSalt
+        ? this.base64ToUint8Array(parsed.kdfSalt)
+        : undefined,
+    };
   }
 }
 
