@@ -20,12 +20,12 @@ CREATE TABLE IF NOT EXISTS files (
 CREATE TABLE IF NOT EXISTS chunks (
     chunk_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     file_id UUID NOT NULL REFERENCES files(file_id) ON DELETE CASCADE,
-    offset INT NOT NULL,
+    "offset" INT NOT NULL, 
     size_bytes INT NOT NULL,
-    sha256 TEXT NOT NULL, -- hash of ciphertext (recommended for E2E)
+    sha256 TEXT NOT NULL,
     etag TEXT,
-    s3_key TEXT NOT NULL, -- e.g., fileId/chunkIndex or fileId/chunkId
-    UNIQUE(file_id, offset)
+    s3_key TEXT NOT NULL,
+    UNIQUE(file_id, "offset") 
 );
 
 
@@ -50,5 +50,13 @@ CREATE TABLE IF NOT EXISTS events (
 
 -- Useful indexes
 CREATE INDEX IF NOT EXISTS idx_files_owner ON files(owner_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_chunks_file ON chunks(file_id, offset);
+CREATE INDEX IF NOT EXISTS idx_chunks_file ON chunks(file_id, "offset");
 CREATE INDEX IF NOT EXISTS idx_events_file ON events(file_id, at DESC);
+
+-- User de démo pour les tests
+INSERT INTO users (user_id, email, public_key) 
+VALUES (
+    '123e4567-e89b-12d3-a456-426614174000',
+    'demo@example.com',
+    decode('fake-public-key', 'escape')
+) ON CONFLICT (user_id) DO NOTHING;

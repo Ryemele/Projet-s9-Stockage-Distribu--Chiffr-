@@ -67,21 +67,17 @@ services:
       "set -e;
       until (/usr/bin/mc alias set $${MINIO_ALIAS} $${MINIO_ENDPOINT} $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD}); do echo 'waiting for minio...'; sleep 2; done;
       /usr/bin/mc mb --ignore-existing $${MINIO_ALIAS}/$${S3_BUCKET};
-      # Create a restricted user for the gateway
+      
+      # Supprime l'user s'il existe déjà
+      /usr/bin/mc admin user remove $${MINIO_ALIAS} $${S3_ACCESS_KEY} 2>/dev/null || true;
+      
+      # Crée l'utilisateur gateway
       /usr/bin/mc admin user add $${MINIO_ALIAS} $${S3_ACCESS_KEY} $${S3_SECRET_KEY};
-      # Policy: allow put/get on the project bucket only
-      cat <<'POL' > /tmp/gateway-policy.json
-      {
-        "Version": "2012-10-17",
-        "Statement": [
-        {"Effect":"Allow","Action":["s3:ListBucket"],"Resource":["arn:aws:s3:::${S3_BUCKET}"]},
-        {"Effect":"Allow","Action":["s3:PutObject","s3:GetObject","s3:DeleteObject"],"Resource":["arn:aws:s3:::${S3_BUCKET}/*"]}
-        ]
-      }
-      POL 
-      /usr/bin/mc admin policy add $${MINIO_ALIAS} gateway-policy /tmp/gateway-policy.json;
-      /usr/bin/mc admin policy set $${MINIO_ALIAS} gateway-policy user=$${S3_ACCESS_KEY};
-      # Lock bucket: no anonymous access
+      
+      # Attache la policy readwrite (permissions complètes)
+      /usr/bin/mc admin policy attach $${MINIO_ALIAS} readwrite --user=$${S3_ACCESS_KEY};
+      
+      # Lock bucket
       /usr/bin/mc anonymous set none $${MINIO_ALIAS}/$${S3_BUCKET};
       echo 'MinIO initialized.'"
     networks: [app_net]
