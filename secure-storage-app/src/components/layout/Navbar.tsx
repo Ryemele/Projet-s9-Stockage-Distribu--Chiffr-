@@ -69,8 +69,16 @@ export const Navbar: React.FC = () => {
                 to="/profile"
                 className="flex items-center space-x-2 px-4 py-2 rounded-xl hover:bg-gray-100/80 transition-all duration-200 group"
               >
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-500 to-secondary-400 flex items-center justify-center shadow-md group-hover:shadow-lg transition-all duration-200">
-                  <User className="h-4 w-4 text-white" />
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-500 to-secondary-400 flex items-center justify-center shadow-md group-hover:shadow-lg transition-all duration-200 overflow-hidden">
+                  {user.avatar ? (
+                    <img
+                      src={user.avatar}
+                      alt={user.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <User className="h-4 w-4 text-white" />
+                  )}
                 </div>
                 <span className="text-sm font-medium text-gray-700 hidden sm:inline">
                   {user.name}

@@ -131,6 +131,7 @@ export const FileList: React.FC<{ key?: number }> = () => {
           size: f.size,
           uploadedAt: f.uploadedAt,
           encrypted: true,
+          mimeType: f.mimeType,
         }))}
         loading={loading}
         error={error}

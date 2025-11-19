@@ -122,6 +122,14 @@ export const mockTeams: Team[] = [
 export const mockTeamMembers: Record<string, TeamMember[]> = {
   "team-1": [
     {
+      id: "member-1-0",
+      name: "Admin User",
+      email: "admin@example.com",
+      role: "admin",
+      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Admin",
+      joinedAt: new Date("2024-01-10").toISOString(),
+    },
+    {
       id: "member-1-1",
       name: "John Doe",
       email: "john@example.com",
@@ -388,6 +396,22 @@ export const updateTeam = (
   if (index > -1) {
     mockTeams[index] = { ...mockTeams[index], ...updatedTeam };
     return mockTeams[index];
+  }
+  return undefined;
+};
+
+// Helper to get user info by email from all teams
+export const getUserByEmail = (email: string): { name: string; email: string; avatar?: string } | undefined => {
+  // Search in all team members
+  for (const teamId in mockTeamMembers) {
+    const member = mockTeamMembers[teamId].find((m) => m.email === email);
+    if (member) {
+      return {
+        name: member.name,
+        email: member.email,
+        avatar: member.avatar,
+      };
+    }
   }
   return undefined;
 };

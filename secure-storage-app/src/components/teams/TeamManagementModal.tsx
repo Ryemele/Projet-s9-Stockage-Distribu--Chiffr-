@@ -99,17 +99,48 @@ export const TeamManagementModal: React.FC<TeamManagementModalProps> = ({
               <UsersIcon className="h-8 w-8 text-white" />
             </div>
             <div className="flex-1">
-              <h2 className="text-3xl font-bold text-white mb-1">
+              <h2 className="text-3xl font-bold text-white mb-2">
                 {team.name}
               </h2>
-              <div className="flex items-center gap-4 text-white/90">
-                <span className="text-sm font-medium">
-                  {team.members.length} members
-                </span>
-                <span className="text-white/60">•</span>
-                <span className="text-sm font-medium">
-                  {exactFileCount} files shared
-                </span>
+              <div className="flex items-center gap-4">
+                {/* Members Avatars */}
+                <div className="flex -space-x-2">
+                  {team.members.slice(0, 5).map((member, index) => (
+                    <div
+                      key={member.id}
+                      className="relative w-8 h-8 rounded-full border-2 border-white bg-gradient-to-br from-primary-400 to-secondary-500 flex items-center justify-center text-white text-xs font-semibold shadow-md overflow-hidden"
+                      title={member.name}
+                      style={{ zIndex: team.members.length - index }}
+                    >
+                      {member.avatar ? (
+                        <img
+                          src={member.avatar}
+                          alt={member.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <span>{member.name.charAt(0).toUpperCase()}</span>
+                      )}
+                    </div>
+                  ))}
+                  {team.members.length > 5 && (
+                    <div
+                      className="relative w-8 h-8 rounded-full border-2 border-white bg-white/20 backdrop-blur-sm flex items-center justify-center text-white text-xs font-semibold shadow-md"
+                      style={{ zIndex: 0 }}
+                    >
+                      +{team.members.length - 5}
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center gap-3 text-white/90">
+                  <span className="text-sm font-medium">
+                    {team.members.length} members
+                  </span>
+                  <span className="text-white/60">•</span>
+                  <span className="text-sm font-medium">
+                    {exactFileCount} files shared
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -155,7 +186,7 @@ export const TeamManagementModal: React.FC<TeamManagementModalProps> = ({
                     : "bg-gray-200 text-gray-600"
                 }`}
               >
-                {team.sharedFiles}
+                {exactFileCount}
               </span>
             </button>
             {isAdmin && (
@@ -224,10 +255,18 @@ export const TeamManagementModal: React.FC<TeamManagementModalProps> = ({
                         className="group flex items-center justify-between gap-3 p-3 hover:bg-white rounded-lg transition-all"
                       >
                         <div className="flex items-center gap-3 flex-1 min-w-0">
-                          <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-secondary-400 rounded-full flex items-center justify-center flex-shrink-0">
-                            <span className="text-white font-medium text-sm">
-                              {member.name.charAt(0).toUpperCase()}
-                            </span>
+                          <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-secondary-400 rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden">
+                            {member.avatar ? (
+                              <img
+                                src={member.avatar}
+                                alt={member.name}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <span className="text-white font-medium text-sm">
+                                {member.name.charAt(0).toUpperCase()}
+                              </span>
+                            )}
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-gray-900 truncate">

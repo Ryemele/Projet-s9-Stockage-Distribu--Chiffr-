@@ -9,12 +9,17 @@ import {
   Share2,
   Edit2,
   Star,
+  FileText,
+  Image,
+  Video,
+  Archive,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type { Folder as FolderType } from '../../types/folder';
 import type { EncryptedFile } from '../../types';
 import { FOLDER_COLORS } from '../../types/folder';
 import { getSubFolders, getFilesByFolder } from '../../mocks';
+import { categorizeFile } from '../../utils/fileCategories';
 
 type ItemType = 'folder' | 'file';
 
@@ -70,6 +75,23 @@ export const UnifiedFolderTable: React.FC<UnifiedFolderTableProps> = ({
       month: 'short',
       day: 'numeric',
     });
+  };
+
+  const getFileIcon = (file: EncryptedFile) => {
+    const category = categorizeFile(file.mimeType || '', file.name);
+
+    switch (category) {
+      case 'documents':
+        return { icon: FileText, color: 'text-blue-600', bg: 'bg-blue-100' };
+      case 'images':
+        return { icon: Image, color: 'text-green-600', bg: 'bg-green-100' };
+      case 'videos':
+        return { icon: Video, color: 'text-purple-600', bg: 'bg-purple-100' };
+      case 'archives':
+        return { icon: Archive, color: 'text-orange-600', bg: 'bg-orange-100' };
+      default:
+        return { icon: File, color: 'text-gray-600', bg: 'bg-gray-100' };
+    }
   };
 
   const toggleFolder = (folderId: string, e: React.MouseEvent) => {
@@ -176,19 +198,22 @@ export const UnifiedFolderTable: React.FC<UnifiedFolderTableProps> = ({
               )}
 
               {/* Icon */}
-              <div
-                className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                  isFolder
-                    ? `bg-gradient-to-br ${colorConfig?.gradient}`
-                    : 'bg-primary-50'
-                }`}
-              >
-                {isFolder ? (
+              {isFolder ? (
+                <div
+                  className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 bg-gradient-to-br ${colorConfig?.gradient}`}
+                >
                   <Folder className="h-4 w-4 text-white" />
-                ) : (
-                  <File className="h-4 w-4 text-primary-600" />
-                )}
-              </div>
+                </div>
+              ) : (
+                (() => {
+                  const { icon: FileIcon, color, bg } = getFileIcon(file!);
+                  return (
+                    <div className={`w-9 h-9 ${bg} rounded-lg flex items-center justify-center flex-shrink-0`}>
+                      <FileIcon className={`h-4 w-4 ${color}`} />
+                    </div>
+                  );
+                })()
+              )}
 
               {/* Name */}
               <span className={`text-sm ${isFolder ? 'font-medium text-gray-900' : 'text-gray-700'}`}>

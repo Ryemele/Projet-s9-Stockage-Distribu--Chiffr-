@@ -102,12 +102,43 @@ export const TeamCard: React.FC<TeamCardProps> = ({ team, onManage, onDelete, on
           <p className="text-sm text-gray-600 line-clamp-2 mb-4">{team.description}</p>
         )}
 
-        {/* Stats */}
-        <div className="flex items-center gap-6 pt-4 border-t border-gray-100">
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <Users className="h-4 w-4 text-gray-400" />
-            <span>{team.members.length} {team.members.length === 1 ? 'member' : 'members'}</span>
+        {/* Members Avatars */}
+        <div className="flex items-center gap-3 mb-3">
+          <div className="flex -space-x-2">
+            {team.members.slice(0, 4).map((member, index) => (
+              <div
+                key={member.id}
+                className="relative w-8 h-8 rounded-full border-2 border-white bg-gradient-to-br from-primary-400 to-secondary-500 flex items-center justify-center text-white text-xs font-semibold shadow-sm"
+                title={member.name}
+                style={{ zIndex: team.members.length - index }}
+              >
+                {member.avatar ? (
+                  <img
+                    src={member.avatar}
+                    alt={member.name}
+                    className="w-full h-full rounded-full object-cover"
+                  />
+                ) : (
+                  <span>{member.name.charAt(0).toUpperCase()}</span>
+                )}
+              </div>
+            ))}
+            {team.members.length > 4 && (
+              <div
+                className="relative w-8 h-8 rounded-full border-2 border-white bg-gray-200 flex items-center justify-center text-gray-600 text-xs font-semibold shadow-sm"
+                style={{ zIndex: 0 }}
+              >
+                +{team.members.length - 4}
+              </div>
+            )}
           </div>
+          <span className="text-sm text-gray-500">
+            {team.members.length} {team.members.length === 1 ? 'member' : 'members'}
+          </span>
+        </div>
+
+        {/* Stats */}
+        <div className="flex items-center gap-6 pt-3 border-t border-gray-100">
           <div className="text-sm text-gray-500">
             {exactFileCount} {exactFileCount === 1 ? 'file' : 'files'}
           </div>

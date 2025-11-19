@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { Search, Clock, Star, FileIcon, FolderIcon, Grid3x3, List, SlidersHorizontal } from 'lucide-react';
 import { FileTable } from '../components/files/FileTable';
+import { FileGrid } from '../components/files/FileGrid';
 import { getAllFiles, toggleFileStarred } from '../mocks';
+import { getUserByEmail } from '../mocks/teams';
 
 type FilterType = 'all' | 'recent' | 'starred' | 'documents' | 'images';
 type SortType = 'name' | 'date' | 'size';
@@ -227,36 +229,69 @@ export const MyFilesPage: React.FC = () => {
 
         {/* Content */}
         <div className="p-6">
-          <FileTable
-            key={refreshKey}
-            files={filteredFiles.map(f => ({
-              id: f.id,
-              name: f.name,
-              size: f.size,
-              uploadedAt: f.uploadedAt,
-              uploadedBy: f.uploadedBy,
-              encrypted: true,
-              starred: f.starred,
-            }))}
-            showStats={false}
-            showSearch={false}
-            showUploadButton={false}
-            canDelete={true}
-            onDownload={(file) => {
-              console.log('Download file:', file.id);
-              alert(`Downloading ${file.name}...`);
-            }}
-            onDelete={(file) => {
-              if (confirm(`Delete ${file.name}?`)) {
-                console.log('Delete file:', file.id);
-              }
-            }}
-            onShare={(file) => {
-              console.log('Share file:', file.id);
-              alert(`Share ${file.name} with team`);
-            }}
-            onToggleStar={handleToggleStar}
-          />
+          {viewMode === 'list' ? (
+            <FileTable
+              key={refreshKey}
+              files={filteredFiles.map(f => ({
+                id: f.id,
+                name: f.name,
+                size: f.size,
+                uploadedAt: f.uploadedAt,
+                uploadedBy: f.uploadedBy,
+                uploadedByUser: f.uploadedBy ? getUserByEmail(f.uploadedBy) : undefined,
+                encrypted: true,
+                starred: f.starred,
+                mimeType: f.mimeType,
+              }))}
+              showStats={false}
+              showSearch={false}
+              showUploadButton={false}
+              canDelete={true}
+              onDownload={(file) => {
+                console.log('Download file:', file.id);
+                alert(`Downloading ${file.name}...`);
+              }}
+              onDelete={(file) => {
+                if (confirm(`Delete ${file.name}?`)) {
+                  console.log('Delete file:', file.id);
+                }
+              }}
+              onShare={(file) => {
+                console.log('Share file:', file.id);
+                alert(`Share ${file.name} with team`);
+              }}
+              onToggleStar={handleToggleStar}
+            />
+          ) : (
+            <FileGrid
+              key={refreshKey}
+              files={filteredFiles.map(f => ({
+                id: f.id,
+                name: f.name,
+                size: f.size,
+                uploadedAt: f.uploadedAt,
+                uploadedBy: f.uploadedBy,
+                uploadedByUser: f.uploadedBy ? getUserByEmail(f.uploadedBy) : undefined,
+                encrypted: true,
+                starred: f.starred,
+                mimeType: f.mimeType,
+              }))}
+              onDownload={(file) => {
+                console.log('Download file:', file.id);
+                alert(`Downloading ${file.name}...`);
+              }}
+              onDelete={(file) => {
+                if (confirm(`Delete ${file.name}?`)) {
+                  console.log('Delete file:', file.id);
+                }
+              }}
+              onShare={(file) => {
+                console.log('Share file:', file.id);
+                alert(`Share ${file.name} with team`);
+              }}
+              onToggleStar={handleToggleStar}
+            />
+          )}
         </div>
       </div>
     </div>

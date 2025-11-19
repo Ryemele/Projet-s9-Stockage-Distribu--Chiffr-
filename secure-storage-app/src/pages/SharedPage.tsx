@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
-import { Share2, Search } from 'lucide-react';
+import { Share2, Search, Grid3x3, List } from 'lucide-react';
 import type { EncryptedFile } from '../types';
 import { FileTable } from '../components/files/FileTable';
+import { FileGrid } from '../components/files/FileGrid';
 import { getSharedWithMeFiles, deleteFileById, toggleFileStarred } from '../mocks';
+import { getUserByEmail } from '../mocks/teams';
 
 export const SharedPage: React.FC = () => {
   const [refreshKey, setRefreshKey] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
 
   // Get files shared with current user
   const allSharedFiles: EncryptedFile[] = getSharedWithMeFiles();
@@ -49,7 +52,7 @@ export const SharedPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Search Bar */}
+      {/* Search Bar and View Toggle */}
       <div className="flex items-center gap-4">
         <div className="flex-1 max-w-md relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -60,6 +63,32 @@ export const SharedPage: React.FC = () => {
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
+        </div>
+
+        {/* View Mode Toggle */}
+        <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg p-1">
+          <button
+            onClick={() => setViewMode('grid')}
+            className={`p-2 rounded transition-colors ${
+              viewMode === 'grid'
+                ? 'bg-primary-50 text-primary-600'
+                : 'text-gray-400 hover:text-gray-600'
+            }`}
+            title="Grid view"
+          >
+            <Grid3x3 className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => setViewMode('list')}
+            className={`p-2 rounded transition-colors ${
+              viewMode === 'list'
+                ? 'bg-primary-50 text-primary-600'
+                : 'text-gray-400 hover:text-gray-600'
+            }`}
+            title="List view"
+          >
+            <List className="h-4 w-4" />
+          </button>
         </div>
       </div>
 
@@ -74,10 +103,39 @@ export const SharedPage: React.FC = () => {
             When others share files with you, they will appear here
           </p>
         </div>
-      ) : (
+      ) : viewMode === 'list' ? (
         <FileTable
           key={refreshKey}
-          files={sharedFiles}
+          files={sharedFiles.map(file => ({
+            id: file.id,
+            name: file.name,
+            size: file.size,
+            uploadedAt: file.uploadedAt,
+            encrypted: true,
+            starred: file.starred,
+            uploadedBy: file.uploadedBy,
+            uploadedByUser: file.uploadedBy ? getUserByEmail(file.uploadedBy) : undefined,
+            mimeType: file.mimeType,
+          }))}
+          onDelete={handleDeleteFile}
+          onDownload={handleDownloadFile}
+          onShare={handleShareFile}
+          onToggleStar={handleToggleStar}
+        />
+      ) : (
+        <FileGrid
+          key={refreshKey}
+          files={sharedFiles.map(file => ({
+            id: file.id,
+            name: file.name,
+            size: file.size,
+            uploadedAt: file.uploadedAt,
+            encrypted: true,
+            starred: file.starred,
+            uploadedBy: file.uploadedBy,
+            uploadedByUser: file.uploadedBy ? getUserByEmail(file.uploadedBy) : undefined,
+            mimeType: file.mimeType,
+          }))}
           onDelete={handleDeleteFile}
           onDownload={handleDownloadFile}
           onShare={handleShareFile}

@@ -6,6 +6,9 @@ import {
   Grid3x3,
   List,
   FileText,
+  FileIcon,
+  HardDrive,
+  Users,
 } from "lucide-react";
 import type { Folder } from "../types/folder";
 import { FolderCard } from "../components/folders/FolderCard";
@@ -18,6 +21,8 @@ import {
   calculateTotalStorage,
   formatSize,
 } from "../mocks";
+import { getUserByEmail } from "../mocks/teams";
+import { calculateStorageByCategory } from "../utils/fileCategories";
 
 export const FoldersPage: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -56,6 +61,27 @@ export const FoldersPage: React.FC = () => {
   const totalFiles = allFiles.length; // Exact number of files
   const totalSize = calculateTotalStorage(); // Calculate real total size from all files
 
+  // Calculate storage by category using the utility function
+  const storageByCategory = calculateStorageByCategory(allFiles);
+  const totalStorage = calculateTotalStorage();
+
+  // Calculate percentages and create segments for the circle
+  const segments = Object.entries(storageByCategory)
+    .filter(([_, data]) => data.size > 0)
+    .map(([key, data]) => ({
+      key,
+      ...data,
+      percentage: (data.size / totalStorage) * 100,
+    }));
+
+  // Get all unique participants from files
+  const getParticipants = () => {
+    const uniqueEmails = new Set(allFiles.map(f => f.uploadedBy).filter(Boolean));
+    return Array.from(uniqueEmails).slice(0, 8);
+  };
+
+  const participants = getParticipants();
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -76,40 +102,156 @@ export const FoldersPage: React.FC = () => {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-primary-50 rounded-lg flex items-center justify-center">
-              <FolderIcon className="h-5 w-5 text-primary-600" />
+        {/* Files & Folders Card */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow">
+          <h3 className="text-sm font-semibold text-gray-900 mb-4">Overview</h3>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-primary-50 rounded-lg flex items-center justify-center">
+                  <FolderIcon className="h-5 w-5 text-primary-600" />
+                </div>
+                <span className="text-sm text-gray-600">Folders</span>
+              </div>
+              <span className="text-xl font-bold text-gray-900">{totalFolders}</span>
             </div>
-            <div>
-              <p className="text-sm text-gray-600">Total Folders</p>
-              <p className="text-2xl font-bold text-gray-900">{totalFolders}</p>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-secondary-50 rounded-lg flex items-center justify-center">
+                  <FileIcon className="h-5 w-5 text-secondary-400" />
+                </div>
+                <span className="text-sm text-gray-600">Files</span>
+              </div>
+              <span className="text-xl font-bold text-gray-900">{totalFiles}</span>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center">
-              <FileText className="h-5 w-5 text-green-600" />
+        {/* Participants Card */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-gray-900">Participants</h3>
+            <div className="flex items-center gap-1 text-xs text-gray-500">
+              <Users className="h-4 w-4" />
+              <span>{participants.length}</span>
             </div>
-            <div>
-              <p className="text-sm text-gray-600">Total Files</p>
-              <p className="text-2xl font-bold text-gray-900">{totalFiles}</p>
-            </div>
+          </div>
+          <div className="space-y-3">
+            {participants.slice(0, 3).map((email, index) => {
+              const user = getUserByEmail(email);
+              return (
+                <div key={index} className="flex items-center gap-3">
+                  <div
+                    className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-500 to-secondary-400 flex items-center justify-center overflow-hidden shadow-sm flex-shrink-0"
+                  >
+                    {user?.avatar ? (
+                      <img
+                        src={user.avatar}
+                        alt={user.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-white text-sm font-semibold">
+                        {(user?.name || email).charAt(0).toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {user?.name || 'Unknown'}
+                    </p>
+                    <p className="text-xs text-gray-500 truncate">
+                      {email}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
+            {participants.length > 3 && (
+              <div className="text-xs text-gray-500 text-center pt-2 border-t border-gray-100">
+                +{participants.length - 3} more participants
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-purple-50 rounded-lg flex items-center justify-center">
-              <FolderIcon className="h-5 w-5 text-purple-600" />
+        {/* Storage by Category Card */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow">
+          <div className="flex items-start justify-between gap-6">
+            <div className="flex-1">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center">
+                  <HardDrive className="h-5 w-5 text-green-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Storage</p>
+                  <p className="text-xl font-bold text-gray-900">
+                    {formatSize(totalStorage)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Storage Categories Legend */}
+              <div className="space-y-1.5">
+                {segments.map(segment => (
+                  <div key={segment.key} className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="w-2.5 h-2.5 rounded-full"
+                        style={{ backgroundColor: segment.color }}
+                      />
+                      <span className="text-gray-600">{segment.label}</span>
+                    </div>
+                    <span className="font-medium text-gray-900">
+                      {formatSize(segment.size)}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div>
-              <p className="text-sm text-gray-600">Total Size</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {formatSize(totalSize)}
-              </p>
+
+            {/* Circular Chart */}
+            <div className="relative w-20 h-20 flex-shrink-0">
+              <svg className="transform -rotate-90" viewBox="0 0 100 100">
+                {(() => {
+                  let currentAngle = 0;
+                  return segments.map((segment) => {
+                    const angle = (segment.percentage / 100) * 360;
+                    const startAngle = currentAngle;
+                    currentAngle += angle;
+
+                    // Calculate path for segment
+                    const radius = 40;
+                    const centerX = 50;
+                    const centerY = 50;
+
+                    const startRad = (startAngle * Math.PI) / 180;
+                    const endRad = (currentAngle * Math.PI) / 180;
+
+                    const x1 = centerX + radius * Math.cos(startRad);
+                    const y1 = centerY + radius * Math.sin(startRad);
+                    const x2 = centerX + radius * Math.cos(endRad);
+                    const y2 = centerY + radius * Math.sin(endRad);
+
+                    const largeArc = angle > 180 ? 1 : 0;
+
+                    return (
+                      <path
+                        key={segment.key}
+                        d={`M ${centerX} ${centerY} L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2} Z`}
+                        fill={segment.color}
+                        className="transition-opacity hover:opacity-80"
+                      />
+                    );
+                  });
+                })()}
+                {/* Center white circle */}
+                <circle cx="50" cy="50" r="25" fill="white" />
+              </svg>
+              {/* Center icon */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <HardDrive className="h-5 w-5 text-gray-400" />
+              </div>
             </div>
           </div>
         </div>

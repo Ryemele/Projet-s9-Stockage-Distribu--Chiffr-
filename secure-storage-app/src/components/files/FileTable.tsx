@@ -10,7 +10,14 @@ import {
   Search,
   Upload,
   Star,
+  FileText,
+  Image,
+  Video,
+  Archive,
+  Music,
+  Code,
 } from "lucide-react";
+import { categorizeFile } from "../../utils/fileCategories";
 
 interface FileTableFile {
   id: string;
@@ -18,8 +25,14 @@ interface FileTableFile {
   size: number;
   uploadedAt: string;
   uploadedBy?: string;
+  uploadedByUser?: {
+    name: string;
+    email: string;
+    avatar?: string;
+  };
   encrypted?: boolean;
   starred?: boolean;
+  mimeType?: string;
 }
 
 interface FileTableProps {
@@ -71,6 +84,23 @@ export const FileTable: React.FC<FileTableProps> = ({
       hour: "2-digit",
       minute: "2-digit",
     });
+  };
+
+  const getFileIcon = (file: FileTableFile) => {
+    const category = categorizeFile(file.mimeType || '', file.name);
+
+    switch (category) {
+      case 'documents':
+        return { icon: FileText, color: 'text-blue-600', bg: 'bg-blue-100' };
+      case 'images':
+        return { icon: Image, color: 'text-green-600', bg: 'bg-green-100' };
+      case 'videos':
+        return { icon: Video, color: 'text-purple-600', bg: 'bg-purple-100' };
+      case 'archives':
+        return { icon: Archive, color: 'text-orange-600', bg: 'bg-orange-100' };
+      default:
+        return { icon: File, color: 'text-gray-600', bg: 'bg-gray-100' };
+    }
   };
 
   const filteredFiles = files.filter((file) =>
@@ -171,7 +201,7 @@ export const FileTable: React.FC<FileTableProps> = ({
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Size
                   </th>
-                  {files.some((f) => f.uploadedBy) && (
+                  {files.some((f) => f.uploadedBy || f.uploadedByUser) && (
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Uploaded By
                     </th>
@@ -189,6 +219,7 @@ export const FileTable: React.FC<FileTableProps> = ({
                 {filteredFiles.map((file) => {
                   const isDownloading = downloadingId === file.id;
                   const isEncrypted = file.encrypted !== false;
+                  const { icon: FileIcon, color, bg } = getFileIcon(file);
 
                   return (
                     <tr
@@ -210,14 +241,14 @@ export const FileTable: React.FC<FileTableProps> = ({
                               <Star
                                 className={`h-5 w-5 transition-colors ${
                                   file.starred
-                                    ? "fill-yellow-400 text-yellow-400"
-                                    : "text-gray-300 hover:text-yellow-400"
+                                    ? "fill-blue-300 text-blue-300"
+                                    : "text-gray-300 hover:text-blue-300"
                                 }`}
                               />
                             </button>
                           )}
-                          <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                            <File className="h-5 w-5 text-primary-600" />
+                          <div className={`w-10 h-10 ${bg} rounded-lg flex items-center justify-center flex-shrink-0`}>
+                            <FileIcon className={`h-5 w-5 ${color}`} />
                           </div>
                           <div>
                             <p className="text-sm font-medium text-gray-900">
@@ -239,16 +270,40 @@ export const FileTable: React.FC<FileTableProps> = ({
                           {formatFileSize(file.size)}
                         </span>
                       </td>
-                      {files.some((f) => f.uploadedBy) && (
+                      {files.some((f) => f.uploadedBy || f.uploadedByUser) && (
                         <td className="px-6 py-4">
-                          {file.uploadedBy && (
+                          {file.uploadedByUser ? (
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary-500 to-secondary-400 flex items-center justify-center overflow-hidden flex-shrink-0">
+                                {file.uploadedByUser.avatar ? (
+                                  <img
+                                    src={file.uploadedByUser.avatar}
+                                    alt={file.uploadedByUser.name}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <span className="text-white text-xs font-semibold">
+                                    {file.uploadedByUser.name.charAt(0).toUpperCase()}
+                                  </span>
+                                )}
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium text-gray-900">
+                                  {file.uploadedByUser.name}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  {file.uploadedByUser.email}
+                                </p>
+                              </div>
+                            </div>
+                          ) : file.uploadedBy ? (
                             <div className="flex items-center gap-2">
                               <User className="h-4 w-4 text-gray-400" />
                               <span className="text-sm text-gray-900">
                                 {file.uploadedBy}
                               </span>
                             </div>
-                          )}
+                          ) : null}
                         </td>
                       )}
                       <td className="px-6 py-4">

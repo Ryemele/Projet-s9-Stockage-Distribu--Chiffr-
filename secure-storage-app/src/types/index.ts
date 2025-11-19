@@ -4,6 +4,7 @@ export interface User {
   email: string;
   name: string;
   createdAt: string;
+  avatar?: string; // Profile picture URL or base64
   publicKey?: string | { publicKey1: string; publicKey2: string }; // For end-to-end encryption (AFGH)
   keyDerivationSalt?: string; // Salt for PBKDF2
 }

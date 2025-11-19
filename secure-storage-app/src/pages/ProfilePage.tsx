@@ -1,135 +1,201 @@
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { User, Mail, Calendar, Shield, Key, AlertTriangle } from 'lucide-react';
+import { Camera, Upload, X } from 'lucide-react';
+import { useToast } from '../contexts/ToastContext';
+
+// Predefined avatar options
+const AVATAR_OPTIONS = [
+  'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix',
+  'https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka',
+  'https://api.dicebear.com/7.x/avataaars/svg?seed=Jasmine',
+  'https://api.dicebear.com/7.x/avataaars/svg?seed=Oscar',
+  'https://api.dicebear.com/7.x/avataaars/svg?seed=Max',
+  'https://api.dicebear.com/7.x/avataaars/svg?seed=Luna',
+  'https://api.dicebear.com/7.x/avataaars/svg?seed=Charlie',
+  'https://api.dicebear.com/7.x/avataaars/svg?seed=Bella',
+];
 
 export const ProfilePage: React.FC = () => {
   const { user } = useAuth();
+  const { showSuccess, showError } = useToast();
+  const [name, setName] = useState(user?.name || '');
+  const [avatarPreview, setAvatarPreview] = useState(user?.avatar || '');
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!user) return null;
 
-  const formatDate = (dateString: string): string => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
+  const handleAvatarClick = () => {
+    setShowAvatarPicker(true);
+  };
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        showError('Invalid file type', 'Please select an image file');
+        return;
+      }
+
+      if (file.size > 5 * 1024 * 1024) {
+        showError('File too large', 'Please select an image smaller than 5MB');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAvatarPreview(reader.result as string);
+        setShowAvatarPicker(false);
+        showSuccess('Avatar updated', 'Your profile picture has been updated');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSelectAvatar = (avatarUrl: string) => {
+    setAvatarPreview(avatarUrl);
+    setShowAvatarPicker(false);
+    showSuccess('Avatar updated', 'Your profile picture has been updated');
+  };
+
+  const handleSave = () => {
+    // TODO: Implement save to backend
+    showSuccess('Changes saved', 'Your profile has been updated');
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Profile</h1>
-        <p className="text-gray-600 mt-1">
-          Manage your personal information and security
-        </p>
-      </div>
-
-      {/* Profile Card */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-        <div className="flex items-start gap-6">
-          <div className="w-20 h-20 bg-gradient-to-br from-primary-500 to-secondary-400 rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0">
-            <User className="h-10 w-10 text-white" />
-          </div>
-          <div className="flex-1">
-            <h2 className="text-2xl font-bold text-gray-900">{user.name}</h2>
-            <p className="text-gray-600 mt-1">Personal Account</p>
-            <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-2 gap-4">
-              <div className="flex items-start gap-3">
-                <Mail className="h-5 w-5 text-gray-400 mt-0.5 flex-shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-xs font-medium text-gray-500 uppercase">Email</p>
-                  <p className="text-sm text-gray-900 truncate">{user.email}</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <Calendar className="h-5 w-5 text-gray-400 mt-0.5 flex-shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-xs font-medium text-gray-500 uppercase">Member Since</p>
-                  <p className="text-sm text-gray-900">{formatDate(user.createdAt)}</p>
-                </div>
-              </div>
-            </div>
-          </div>
+    <div className="space-y-8">
+      {/* Header with Avatar */}
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900">Account</h1>
+          <p className="text-sm text-gray-500 mt-1">Manage your personal information</p>
         </div>
-      </div>
 
-      {/* Security Status */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-        <div className="flex items-start gap-4">
-          <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center flex-shrink-0">
-            <Shield className="h-5 w-5 text-green-600" />
-          </div>
-          <div className="flex-1">
-            <h3 className="text-lg font-semibold text-gray-900">Security Status</h3>
-            <p className="text-sm text-gray-600 mt-1">Your account is protected with end-to-end encryption</p>
-            <div className="mt-4 grid grid-cols-2 gap-4">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                <span className="text-sm text-gray-700">Encryption enabled</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                <span className="text-sm text-gray-700">Keys secured</span>
-              </div>
+        {/* Avatar at extreme right */}
+        <div className="flex flex-col items-end gap-3">
+          <div className="relative group">
+            <div className="w-20 h-20 rounded-full overflow-hidden bg-gray-100 cursor-pointer ring-4 ring-gray-100" onClick={handleAvatarClick}>
+              {avatarPreview ? (
+                <img
+                  src={avatarPreview}
+                  alt={user.name}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-br from-primary-500 to-secondary-400 flex items-center justify-center">
+                  <span className="text-white text-2xl font-bold">
+                    {user.name.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+              )}
             </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Encryption Info */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-        <div className="flex items-start gap-4">
-          <div className="w-10 h-10 bg-primary-50 rounded-lg flex items-center justify-center flex-shrink-0">
-            <Key className="h-5 w-5 text-primary-600" />
-          </div>
-          <div className="flex-1">
-            <h3 className="text-lg font-semibold text-gray-900">Encryption Details</h3>
-            <p className="text-sm text-gray-600 mt-1">How your data is protected</p>
-            <div className="mt-4 space-y-3">
-              <div className="flex items-start gap-3 text-sm">
-                <div className="w-1.5 h-1.5 bg-primary-600 rounded-full mt-1.5 flex-shrink-0"></div>
-                <div>
-                  <span className="font-medium text-gray-900">End-to-end encryption:</span>
-                  <span className="text-gray-600"> Files are encrypted on your device before upload</span>
-                </div>
-              </div>
-              <div className="flex items-start gap-3 text-sm">
-                <div className="w-1.5 h-1.5 bg-primary-600 rounded-full mt-1.5 flex-shrink-0"></div>
-                <div>
-                  <span className="font-medium text-gray-900">Zero-knowledge:</span>
-                  <span className="text-gray-600"> Your encryption keys never leave your device</span>
-                </div>
-              </div>
-              <div className="flex items-start gap-3 text-sm">
-                <div className="w-1.5 h-1.5 bg-primary-600 rounded-full mt-1.5 flex-shrink-0"></div>
-                <div>
-                  <span className="font-medium text-gray-900">Password-based:</span>
-                  <span className="text-gray-600"> Keys are derived from your password using PBKDF2</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Danger Zone */}
-      <div className="bg-white rounded-lg border border-red-200 shadow-sm p-6">
-        <div className="flex items-start gap-4">
-          <div className="w-10 h-10 bg-red-50 rounded-lg flex items-center justify-center flex-shrink-0">
-            <AlertTriangle className="h-5 w-5 text-red-600" />
-          </div>
-          <div className="flex-1">
-            <h3 className="text-lg font-semibold text-gray-900">Danger Zone</h3>
-            <p className="text-sm text-gray-600 mt-1">
-              Permanently delete your account and all associated data. This action cannot be undone.
-            </p>
-            <button className="mt-4 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors">
-              Delete Account
+            <button
+              onClick={handleAvatarClick}
+              className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              <Camera className="h-5 w-5 text-white" />
             </button>
           </div>
+          <button
+            onClick={handleAvatarClick}
+            className="text-xs text-primary-600 hover:text-primary-700 font-medium"
+          >
+            Change photo
+          </button>
         </div>
+      </div>
+
+      {/* Avatar Picker */}
+      {showAvatarPicker && (
+        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-base font-semibold text-gray-900">Choose an avatar</h3>
+            <button
+              onClick={() => setShowAvatarPicker(false)}
+              className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          {/* Upload Button */}
+          <button
+            onClick={handleUploadClick}
+            className="w-full mb-6 px-4 py-4 bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl hover:border-primary-500 hover:bg-primary-50 transition-all text-sm font-medium text-gray-700 flex items-center justify-center gap-2"
+          >
+            <Upload className="h-5 w-5" />
+            Upload your own photo
+          </button>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleFileChange}
+            className="hidden"
+          />
+
+          {/* Predefined Avatars Grid */}
+          <div>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Or choose from presets</p>
+            <div className="flex flex-wrap gap-3">
+              {AVATAR_OPTIONS.map((avatarUrl, index) => (
+                <button
+                  key={index}
+                  onClick={() => handleSelectAvatar(avatarUrl)}
+                  className="w-14 h-14 rounded-full overflow-hidden bg-gray-100 hover:ring-4 hover:ring-primary-100 transition-all shadow-sm hover:shadow-md"
+                >
+                  <img
+                    src={avatarUrl}
+                    alt={`Avatar option ${index + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Profile Information */}
+      <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-200 shadow-sm">
+        {/* Name Section */}
+        <div className="p-6">
+          <label className="block">
+            <span className="text-sm font-semibold text-gray-900 mb-3 block">Full name</span>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full max-w-md px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-shadow"
+              placeholder="Enter your name"
+            />
+          </label>
+        </div>
+
+        {/* Email Section */}
+        <div className="p-6">
+          <div>
+            <span className="text-sm font-semibold text-gray-900 mb-3 block">Email address</span>
+            <p className="text-sm text-gray-600">{user.email}</p>
+            <p className="text-xs text-gray-500 mt-1">Your email cannot be changed</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Save Button */}
+      <div className="flex items-center justify-end gap-3 pt-4">
+        <button
+          onClick={handleSave}
+          className="px-6 py-2.5 bg-primary-600 text-white text-sm font-semibold rounded-lg hover:bg-primary-700 transition-colors shadow-sm hover:shadow"
+        >
+          Save changes
+        </button>
       </div>
     </div>
   );
