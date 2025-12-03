@@ -2,10 +2,14 @@ import os
 import uuid
 import requests
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from models import db, User, Permission
 
 app = Flask(__name__)
+
+# Enable CORS for frontend communication
+CORS(app, resources={r"/*": {"origins": ["http://localhost:5173", "http://localhost:3000"]}}, supports_credentials=True)
 
 #  CONFIG 
 

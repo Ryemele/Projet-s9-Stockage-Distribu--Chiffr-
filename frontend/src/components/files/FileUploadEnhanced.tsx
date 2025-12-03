@@ -1,30 +1,29 @@
 import React, { useState, useRef } from "react";
 import { useAuth } from "../../contexts/AuthContext";
-import {
-  mockCryptoService,
-  type MockFileEnvelope,
-} from "../../services/mockCryptoService";
+import { fileProcessingService } from "../../services/fileProcessingService";
+import type { ProcessedFile, FileProcessingProgress } from "../../types/crypto";
 import { apiService } from "../../services/apiService";
 import { Alert } from "../ui";
-import { Upload, File, X, Shield } from "lucide-react";
+import { Upload, File, X, Shield, Lock, Layers } from "lucide-react";
 
 /**
  * Enhanced File Upload Component
  *
  * Features:
- * - File encryption simulation
+ * - Real client-side encryption (AES-GCM)
+ * - File chunking for distributed storage
  * - Progress tracking per file
- * - UI testing ready
- * - Will be integrated with pyUmbrel for real encryption
+ * - End-to-end encryption: only the client sees plaintext data
  */
 
 interface UploadingFile {
   file: File;
-  status: "pending" | "encrypting" | "uploading" | "completed" | "error";
+  status: "pending" | "chunking" | "encrypting" | "uploading" | "completed" | "error";
   progress: number;
   statusMessage: string;
   error?: string;
-  envelope?: MockFileEnvelope;
+  processedFile?: ProcessedFile;
+  chunksCount?: number;
 }
 
 export const FileUploadEnhanced: React.FC<{
@@ -39,7 +38,7 @@ export const FileUploadEnhanced: React.FC<{
   const [success, setSuccess] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { masterKey, keyPair } = useAuth();
+  const { masterKey } = useAuth();
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -86,8 +85,8 @@ export const FileUploadEnhanced: React.FC<{
   };
 
   const handleUpload = async () => {
-    if (!masterKey || !keyPair) {
-      setError("Keys not available. Please log in again.");
+    if (!masterKey) {
+      setError("Master key not available. Please log in again.");
       return;
     }
 
@@ -104,46 +103,64 @@ export const FileUploadEnhanced: React.FC<{
       // Upload files sequentially
       for (const file of selectedFiles) {
         try {
-          console.log(`[Upload] Starting encryption for: ${file.name}`);
+          console.log(`[Upload] Starting processing for: ${file.name}`);
 
           updateFileStatus(file.name, {
-            status: "encrypting",
-            statusMessage: "Starting encryption...",
+            status: "chunking",
+            statusMessage: "Découpage du fichier...",
             progress: 0,
           });
 
-          // Encrypt file with mock service
-          const envelope = await mockCryptoService.encryptFile(
+          // Process file: chunk + encrypt
+          const processedFile = await fileProcessingService.processFileForUpload(
             file,
-            keyPair,
-            (progress, status) => {
-              updateFileStatus(file.name, {
-                status: "encrypting",
-                progress,
-                statusMessage: status,
-              });
+            {
+              masterKey,
+              onProgress: (progress: FileProcessingProgress) => {
+                // Map stage to status
+                let status: UploadingFile["status"] = "chunking";
+                if (progress.stage === "encrypting") status = "encrypting";
+                else if (progress.stage === "uploading") status = "uploading";
+                else if (progress.stage === "complete") status = "completed";
+                else if (progress.stage === "error") status = "error";
+
+                updateFileStatus(file.name, {
+                  status,
+                  progress: progress.overallProgress,
+                  statusMessage: progress.message,
+                });
+              },
             }
           );
 
           console.log(
-            `[Upload] Encryption complete. File ID: ${envelope.fileId}`
+            `[Upload] Processing complete. File ID: ${processedFile.metadata.fileId}, Chunks: ${processedFile.chunks.length}`
           );
 
           updateFileStatus(file.name, {
             status: "uploading",
-            statusMessage: "Uploading to server...",
+            statusMessage: `Uploading ${processedFile.chunks.length} chunks...`,
             progress: 95,
-            envelope,
+            processedFile,
+            chunksCount: processedFile.chunks.length,
           });
 
-          // Convert envelope for API (simplified)
+          // Prepare data for API
           const uploadData = {
-            fileId: envelope.fileId,
-            fileName: envelope.fileName,
-            fileSize: envelope.fileSize,
-            mimeType: envelope.mimeType,
-            encryptedData: envelope.encryptedData,
-            timestamp: envelope.timestamp,
+            fileId: processedFile.metadata.fileId,
+            fileName: processedFile.metadata.fileName,
+            fileSize: processedFile.metadata.totalSize,
+            mimeType: processedFile.metadata.mimeType,
+            totalChunks: processedFile.metadata.totalChunks,
+            chunkSize: processedFile.metadata.chunkSize,
+            fileHash: processedFile.metadata.fileHash,
+            encryptionVersion: processedFile.metadata.encryptionVersion,
+            algorithm: processedFile.metadata.algorithm,
+            // Serialize metadata and chunks for storage
+            metadata: fileProcessingService.serializeMetadata(processedFile.metadata),
+            chunks: processedFile.chunks.map(chunk => 
+              fileProcessingService.serializeChunk(chunk)
+            ),
           };
 
           // Upload to server
@@ -153,7 +170,7 @@ export const FileUploadEnhanced: React.FC<{
 
           updateFileStatus(file.name, {
             status: "completed",
-            statusMessage: "Upload complete!",
+            statusMessage: `Upload complete! (${processedFile.chunks.length} chunks)`,
             progress: 100,
           });
         } catch (fileError) {
@@ -167,7 +184,7 @@ export const FileUploadEnhanced: React.FC<{
         }
       }
 
-      setSuccess(`Successfully uploaded ${selectedFiles.length} file(s)`);
+      setSuccess(`Successfully uploaded ${selectedFiles.length} file(s) with end-to-end encryption`);
       setSelectedFiles([]);
 
       if (onUploadComplete) {
@@ -195,11 +212,23 @@ export const FileUploadEnhanced: React.FC<{
         return "text-green-600";
       case "error":
         return "text-red-600";
+      case "chunking":
       case "encrypting":
       case "uploading":
         return "text-primary-600";
       default:
         return "text-gray-600";
+    }
+  };
+
+  const getStatusIcon = (status: UploadingFile["status"]) => {
+    switch (status) {
+      case "chunking":
+        return <Layers className="w-4 h-4" />;
+      case "encrypting":
+        return <Lock className="w-4 h-4" />;
+      default:
+        return null;
     }
   };
 
@@ -214,8 +243,17 @@ export const FileUploadEnhanced: React.FC<{
           <div className="flex-1">
             <h3 className="font-medium text-gray-900">End-to-end encrypted</h3>
             <p className="text-sm text-gray-600 mt-0.5">
-              Your files are encrypted before upload. Only you can decrypt them.
+              Your files are chunked and encrypted client-side with AES-256-GCM before upload.
+              Only you can decrypt them.
             </p>
+            <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+              <span className="flex items-center gap-1">
+                <Layers className="w-3 h-3" /> Chunking: 1 MB
+              </span>
+              <span className="flex items-center gap-1">
+                <Lock className="w-3 h-3" /> AES-256-GCM
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -281,17 +319,27 @@ export const FileUploadEnhanced: React.FC<{
                     </p>
 
                     {/* Status */}
-                    <p
-                      className={`text-xs mt-2 font-medium ${getStatusColor(
+                    <div className={`flex items-center gap-1.5 text-xs mt-2 font-medium ${getStatusColor(
                         uploadFile.status
                       )}`}
                     >
-                      {uploadFile.statusMessage}
-                      {uploadFile.error && ` - ${uploadFile.error}`}
-                    </p>
+                      {getStatusIcon(uploadFile.status)}
+                      <span>
+                        {uploadFile.statusMessage}
+                        {uploadFile.error && ` - ${uploadFile.error}`}
+                      </span>
+                    </div>
+
+                    {/* Chunks info */}
+                    {uploadFile.chunksCount && uploadFile.status === "completed" && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        {uploadFile.chunksCount} encrypted chunk{uploadFile.chunksCount > 1 ? 's' : ''} created
+                      </p>
+                    )}
 
                     {/* Progress Bar */}
-                    {(uploadFile.status === "encrypting" ||
+                    {(uploadFile.status === "chunking" ||
+                      uploadFile.status === "encrypting" ||
                       uploadFile.status === "uploading") && (
                       <div className="mt-2">
                         <div className="w-full bg-gray-200 rounded-full h-1.5">
