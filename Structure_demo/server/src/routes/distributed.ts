@@ -30,13 +30,19 @@ router.post('/upload', authenticateToken, async (req: Request, res: Response) =>
         const userId = (req as AuthRequest).user?.id;
         const db = getDB();
 
-        const { encryptedData, fileName, mimeType, size, iv, salt } = req.body;
+        const { encryptedData, fileName, mimeType, size, encryptionMetadata } = req.body;
 
         if (!encryptedData || !fileName) {
             return res.status(400).json({ error: 'Missing required fields' });
         }
 
+        // Store encryption metadata as JSON string in IV field (for frontend decryption)
+        const ivField = encryptionMetadata ? JSON.stringify(encryptionMetadata) : '';
+        const saltField = encryptionMetadata?.salt || '';
+
         console.log(`[Distributed] Starting distributed upload for "${fileName}"`);
+        console.log(`[Distributed] encryptionMetadata received:`, encryptionMetadata ? 'YES' : 'NO');
+        console.log(`[Distributed] ivField to store:`, ivField ? ivField.substring(0, 50) + '...' : 'EMPTY');
 
         // Decode base64 encrypted data
         const fileBuffer = Buffer.from(encryptedData, 'base64');
@@ -52,6 +58,11 @@ router.post('/upload', authenticateToken, async (req: Request, res: Response) =>
         // Step 3: Apply Reed-Solomon erasure coding
         const encodedData = erasureService.encode(combinedBuffer);
         console.log(`[Distributed] RS encoded: ${encodedData.dataShards} data + ${encodedData.parityShards} parity shards`);
+        console.log(`[Distributed] Upload debug:`);
+        console.log(`  - Buffer size: ${fileBuffer.length}`);
+        console.log(`  - Combined buffer size: ${combinedBuffer.length}`);
+        console.log(`  - Shard size: ${encodedData.shardSize}`);
+        console.log(`  - Checksum to store: ${encodedData.checksum}`);
 
         // Step 4: Distribute shards to storage nodes
         let placements: ChunkPlacement[] = [];
@@ -72,12 +83,12 @@ router.post('/upload', authenticateToken, async (req: Request, res: Response) =>
             fileId,
             userId,
             fileName,
-            size || fileBuffer.length,
+            fileBuffer.length, // Use actual encrypted data size, not original file size
             mimeType || 'application/octet-stream',
-            iv || '',
-            salt || '',
+            ivField,
+            saltField,
             new Date().toISOString(),
-            chunkedFile.checksum,
+            encodedData.checksum, // Use RS checksum for decode verification
             1, // is_chunked = true
             chunkedFile.totalChunks,
             encodedData.shards.length
@@ -156,6 +167,7 @@ router.post('/upload', authenticateToken, async (req: Request, res: Response) =>
 router.get('/download/:id', authenticateToken, async (req: Request, res: Response) => {
     try {
         const userId = (req as AuthRequest).user?.id;
+        const userEmail = (req as AuthRequest).user?.email;
         const fileId = req.params.id;
         const db = getDB();
 
@@ -168,16 +180,20 @@ router.get('/download/:id', authenticateToken, async (req: Request, res: Respons
 
         // Check access (owner or shared)
         if (file.user_id !== userId) {
+            // Check if file is shared with this user (by email)
             const share = await db.get(
                 `SELECT * FROM shares WHERE file_id = ? AND shared_with = ?`,
-                [fileId, userId]
+                [fileId, userEmail]
             );
             if (!share) {
+                console.log(`[Distributed] Access denied: user ${userEmail} not owner and no share found`);
                 return res.status(403).json({ error: 'Access denied' });
             }
+            console.log(`[Distributed] Access granted via share for ${userEmail}`);
         }
 
         console.log(`[Distributed] Starting download for "${file.name}"`);
+        console.log(`[Distributed] File is_chunked: ${file.is_chunked}, has encrypted_data_url: ${!!file.encrypted_data_url}`);
 
         let fileBuffer: Buffer;
 
@@ -188,7 +204,11 @@ router.get('/download/:id', authenticateToken, async (req: Request, res: Respons
                 [fileId]
             );
 
+            console.log(`[Distributed] Found ${shardRecords.length} shard records in DB`);
+
             if (shardRecords.length > 0 && shardRecords[0].node_url) {
+                console.log(`[Distributed] Shards have node_url, fetching from nodes...`);
+
                 // Retrieve from distributed nodes
                 const placements: ChunkPlacement[] = shardRecords.map((r: any) => ({
                     chunkId: r.shard_id,
@@ -199,11 +219,18 @@ router.get('/download/:id', authenticateToken, async (req: Request, res: Respons
                     verified: r.verified === 1
                 }));
 
+                console.log(`[Distributed] Placements: ${JSON.stringify(placements.map(p => ({ index: p.shardIndex, node: p.nodeId })))}`);
+
                 // Collect shards from nodes
                 const shards = await nodeManager.collectShards(placements);
 
+                const availableShards = shards.filter(s => s !== null).length;
+                console.log(`[Distributed] Collected ${availableShards}/${shards.length} shards`);
+
                 // Check if we can recover
                 const recovery = erasureService.canRecover(shards);
+                console.log(`[Distributed] Recovery check: canRecover=${recovery.canRecover}, available=${recovery.available}, required=${recovery.required}`);
+
                 if (!recovery.canRecover) {
                     return res.status(503).json({
                         error: `Cannot recover file: need ${recovery.required} shards, only have ${recovery.available}`
@@ -253,7 +280,7 @@ router.get('/download/:id', authenticateToken, async (req: Request, res: Respons
             return res.status(400).json({ error: 'Use /files/:id/download for non-chunked files' });
         }
 
-        // Return the file data
+        // Return the file data as raw binary (frontend will handle base64 conversion)
         res.set('Content-Type', file.mime_type || 'application/octet-stream');
         res.set('Content-Length', fileBuffer.length.toString());
         res.set('X-File-Name', file.name);
@@ -261,7 +288,7 @@ router.get('/download/:id', authenticateToken, async (req: Request, res: Respons
         res.set('X-File-Salt', file.salt || '');
         res.set('X-File-Checksum', file.checksum || '');
 
-        res.send(fileBuffer.toString('base64'));
+        res.send(fileBuffer);
 
     } catch (error: any) {
         console.error('[Distributed] Download error:', error);
@@ -340,6 +367,249 @@ router.get('/cluster', authenticateToken, async (req: Request, res: Response) =>
 
     } catch (error: any) {
         res.status(500).json({ error: 'Failed to get cluster status: ' + error.message });
+    }
+});
+
+/**
+ * GET /distributed/nodes/:nodeId/chunks
+ * Get all chunks stored on a specific node
+ */
+router.get('/nodes/:nodeId/chunks', authenticateToken, async (req: Request, res: Response) => {
+    try {
+        const { nodeId } = req.params;
+        const db = getDB();
+
+        // Get all shards for this node with file information
+        const chunks = await db.all(`
+            SELECT s.*, f.name as file_name, f.size as file_size, f.mime_type, f.user_id
+            FROM shards s
+            JOIN files f ON s.file_id = f.id
+            WHERE s.node_id = ?
+            ORDER BY s.created_at DESC
+        `, [nodeId]);
+
+        res.json({
+            nodeId,
+            totalChunks: chunks.length,
+            chunks: chunks.map((c: any) => ({
+                id: c.shard_id,
+                shardIndex: c.shard_index,
+                fileId: c.file_id,
+                fileName: c.file_name,
+                fileSize: c.file_size,
+                isData: c.is_data === 1,
+                size: c.size,
+                stored: c.stored === 1,
+                verified: c.verified === 1,
+                createdAt: c.created_at
+            }))
+        });
+
+    } catch (error: any) {
+        res.status(500).json({ error: 'Failed to get node chunks: ' + error.message });
+    }
+});
+
+/**
+ * GET /distributed/all-chunks
+ * Get all chunks across all nodes for admin visualization
+ */
+router.get('/all-chunks', authenticateToken, async (req: Request, res: Response) => {
+    try {
+        const db = getDB();
+
+        // Get all shards grouped by node
+        const chunks = await db.all(`
+            SELECT s.*, f.name as file_name, f.size as file_size, f.mime_type,
+                   u.email as owner_email
+            FROM shards s
+            JOIN files f ON s.file_id = f.id
+            LEFT JOIN users u ON f.user_id = u.id
+            ORDER BY s.node_id, s.created_at DESC
+        `);
+
+        // Group by node
+        const nodeChunks: { [key: string]: any[] } = {};
+        const nodes = nodeManager.getAllNodes();
+
+        // Initialize all nodes
+        nodes.forEach(node => {
+            nodeChunks[node.id] = [];
+        });
+
+        // Add chunks to their respective nodes
+        chunks.forEach((chunk: any) => {
+            const nodeId = chunk.node_id;
+            if (!nodeChunks[nodeId]) {
+                nodeChunks[nodeId] = [];
+            }
+            nodeChunks[nodeId].push({
+                id: chunk.shard_id,
+                shardIndex: chunk.shard_index,
+                fileId: chunk.file_id,
+                fileName: chunk.file_name,
+                ownerEmail: chunk.owner_email,
+                isData: chunk.is_data === 1,
+                size: chunk.size,
+                stored: chunk.stored === 1,
+                verified: chunk.verified === 1,
+                createdAt: chunk.created_at
+            });
+        });
+
+        res.json({
+            totalChunks: chunks.length,
+            nodeChunks,
+            nodes: nodes.map(n => ({
+                id: n.id,
+                url: `${n.url}:${n.port}`,
+                status: n.status,
+                chunksStored: nodeChunks[n.id]?.length || 0
+            }))
+        });
+
+    } catch (error: any) {
+        res.status(500).json({ error: 'Failed to get all chunks: ' + error.message });
+    }
+});
+
+/**
+ * POST /distributed/nodes/:nodeId/control
+ * Control a storage node (stop, restart, check)
+ */
+router.post('/nodes/:nodeId/control', authenticateToken, async (req: Request, res: Response) => {
+    try {
+        const { nodeId } = req.params;
+        const { action } = req.body; // 'stop', 'restart', 'check'
+
+        const nodes = nodeManager.getAllNodes();
+        const node = nodes.find(n => n.id === nodeId);
+
+        if (!node) {
+            return res.status(404).json({ error: 'Node not found' });
+        }
+
+        let result: any = { nodeId, action };
+
+        switch (action) {
+            case 'check':
+                // Trigger health check
+                try {
+                    const response = await fetch(`${node.url}:${node.port}/health`, {
+                        method: 'GET',
+                        signal: AbortSignal.timeout(5000)
+                    });
+                    if (response.ok) {
+                        const data = await response.json();
+                        result.status = 'online';
+                        result.health = data;
+                    } else {
+                        result.status = 'degraded';
+                    }
+                } catch {
+                    result.status = 'offline';
+                }
+                break;
+
+            case 'stop':
+                // Send shutdown signal to node
+                try {
+                    await fetch(`${node.url}:${node.port}/shutdown`, {
+                        method: 'POST',
+                        signal: AbortSignal.timeout(5000)
+                    });
+                    result.status = 'stopped';
+                    result.message = 'Shutdown signal sent';
+                } catch {
+                    result.status = 'unknown';
+                    result.message = 'Could not reach node';
+                }
+                break;
+
+            case 'restart':
+                // Note: Actual restart requires process management (not possible via HTTP)
+                result.message = 'Restart must be done at the OS level. Use the start-nodes script.';
+                result.hint = '.\\start-nodes.ps1';
+                break;
+
+            default:
+                return res.status(400).json({ error: 'Invalid action. Use: check, stop, restart' });
+        }
+
+        res.json(result);
+
+    } catch (error: any) {
+        res.status(500).json({ error: 'Node control failed: ' + error.message });
+    }
+});
+
+/**
+ * GET /distributed/health
+ * Get detailed health info for all nodes
+ */
+router.get('/health', authenticateToken, async (req: Request, res: Response) => {
+    try {
+        const nodes = nodeManager.getAllNodes();
+        const db = getDB();
+
+        // Get chunk counts per node from database
+        const chunkCounts = await db.all(`
+            SELECT node_id, COUNT(*) as count, SUM(size) as total_size
+            FROM shards
+            WHERE stored = 1
+            GROUP BY node_id
+        `);
+
+        const chunkMap: { [key: string]: { count: number; size: number } } = {};
+        chunkCounts.forEach((c: any) => {
+            chunkMap[c.node_id] = { count: c.count, size: c.total_size || 0 };
+        });
+
+        const healthData = await Promise.all(nodes.map(async (node) => {
+            let status = node.status;
+            let latency = node.latency;
+            let health: any = null;
+
+            try {
+                const start = Date.now();
+                const response = await fetch(`${node.url}:${node.port}/health`, {
+                    method: 'GET',
+                    signal: AbortSignal.timeout(3000)
+                });
+                latency = Date.now() - start;
+                if (response.ok) {
+                    status = 'online';
+                    health = await response.json();
+                }
+            } catch {
+                status = 'offline';
+                latency = -1;
+            }
+
+            return {
+                id: node.id,
+                url: `${node.url}:${node.port}`,
+                status,
+                latency,
+                chunksStored: chunkMap[node.id]?.count || 0,
+                storageUsed: chunkMap[node.id]?.size || 0,
+                health
+            };
+        }));
+
+        const onlineCount = healthData.filter(n => n.status === 'online').length;
+
+        res.json({
+            timestamp: new Date().toISOString(),
+            totalNodes: nodes.length,
+            onlineNodes: onlineCount,
+            offlineNodes: nodes.length - onlineCount,
+            healthy: onlineCount >= 4, // Need at least 4 for RS(4,2)
+            nodes: healthData
+        });
+
+    } catch (error: any) {
+        res.status(500).json({ error: 'Health check failed: ' + error.message });
     }
 });
 

@@ -1,6 +1,6 @@
 import React, { type ReactNode } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { Sidebar } from './Sidebar';
+import { Sidebar, MobileMenuProvider, MobileHeader } from './Sidebar';
 import { Navbar } from './Navbar';
 
 interface LayoutProps {
@@ -13,22 +13,28 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   // If authenticated, use sidebar layout
   if (isAuthenticated) {
     return (
-      <div className="h-screen bg-gray-50 relative overflow-hidden">
-        <Sidebar />
+      <MobileMenuProvider>
+        <div className="h-screen bg-gray-50 relative overflow-hidden">
+          {/* Mobile Header with hamburger */}
+          <MobileHeader />
 
-        {/* Main content with sidebar offset - exact fit */}
-        <main className="ml-64 h-screen overflow-y-auto">
-          <div className="px-8 py-6 w-full">
-            {children}
+          {/* Sidebar (responsive) */}
+          <Sidebar />
+
+          {/* Main content with sidebar offset on desktop, full width on mobile */}
+          <main className="lg:ml-64 h-screen overflow-y-auto pt-16 lg:pt-0">
+            <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 w-full">
+              {children}
+            </div>
+          </main>
+
+          {/* Subtle decorative background */}
+          <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+            <div className="absolute top-0 right-0 w-96 h-96 bg-blue-400/5 rounded-full mix-blend-multiply filter blur-3xl"></div>
+            <div className="absolute bottom-0 left-0 w-96 h-96 bg-indigo-400/5 rounded-full mix-blend-multiply filter blur-3xl"></div>
           </div>
-        </main>
-
-        {/* Subtle decorative background */}
-        <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-blue-400/5 rounded-full mix-blend-multiply filter blur-3xl"></div>
-          <div className="absolute bottom-0 left-0 w-96 h-96 bg-indigo-400/5 rounded-full mix-blend-multiply filter blur-3xl"></div>
         </div>
-      </div>
+      </MobileMenuProvider>
     );
   }
 
@@ -36,7 +42,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   return (
     <div className="min-h-screen relative">
       <Navbar />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-12">
         {children}
       </main>
 

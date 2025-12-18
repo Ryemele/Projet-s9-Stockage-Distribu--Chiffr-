@@ -86,7 +86,8 @@ router.post('/register', async (req: Request, res: Response) => {
                 name,
                 publicKey,
                 createdAt,
-                keyDerivationSalt
+                keyDerivationSalt,
+                role: 'user'
             }
         });
     } catch (error) {
@@ -128,7 +129,8 @@ router.post('/login', async (req: Request, res: Response) => {
                 email: user.email,
                 name: user.name,
                 publicKey: publicKey,
-                createdAt: user.created_at
+                createdAt: user.created_at,
+                role: user.role || 'user'
             }
         });
     } catch (error) {
@@ -143,7 +145,7 @@ router.get('/me', authenticateToken, async (req: Request, res: Response) => {
         const userId = (req as AuthRequest).user?.id;
         const db = getDB();
 
-        const user = await db.get('SELECT id, email, name, public_key, created_at FROM users WHERE id = ?', [userId]);
+        const user = await db.get('SELECT id, email, name, public_key, created_at, role FROM users WHERE id = ?', [userId]);
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
@@ -155,7 +157,8 @@ router.get('/me', authenticateToken, async (req: Request, res: Response) => {
 
         res.json({
             ...user,
-            publicKey
+            publicKey,
+            role: user.role || 'user'
         });
     } catch (error) {
         res.status(500).json({ message: 'Internal server error' });

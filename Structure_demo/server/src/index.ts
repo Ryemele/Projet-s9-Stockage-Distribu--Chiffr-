@@ -12,6 +12,8 @@ import authRoutes from './routes/auth';
 import fileRoutes from './routes/files';
 import userRoutes from './routes/users';
 import distributedRoutes from './routes/distributed';
+import foldersRoutes from './routes/folders';
+import teamsRoutes from './routes/teams';
 import { nodeManager } from './services/nodeManager';
 
 // SECURITY: Check required environment variables
@@ -82,6 +84,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/files', fileRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/distributed', distributedRoutes);
+app.use('/api/folders', foldersRoutes);
+app.use('/api/teams', teamsRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
@@ -113,8 +117,12 @@ const startServer = async () => {
             cert: pems.cert
         };
 
-        https.createServer(httpsOptions, app).listen(PORT, () => {
-            console.log(`Secure Server running on https://localhost:${PORT}`);
+        const HOST = process.env.HOST || '0.0.0.0';
+        const portNum = Number(PORT);
+
+        https.createServer(httpsOptions, app).listen(portNum, HOST, () => {
+            console.log(`Secure Server running on https://${HOST}:${PORT}`);
+            console.log(`For phone access, use your computer's IP address`);
             console.log(`Distributed storage API: /api/distributed`);
         });
 

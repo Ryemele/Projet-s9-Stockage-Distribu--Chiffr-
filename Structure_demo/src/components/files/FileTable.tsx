@@ -14,6 +14,7 @@ import {
   Image,
   Video,
   Archive,
+  Eye,
 } from "lucide-react";
 import { categorizeFile } from "../../utils/fileCategories";
 
@@ -347,6 +348,16 @@ export const FileTable: React.FC<FileTableProps> = ({
 
                       <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-end gap-2 transition-opacity">
+                          {onPreview && (
+                            <button
+                              onClick={() => onPreview(file)}
+                              className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-all"
+                              title="Preview"
+                              disabled={isDownloading}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </button>
+                          )}
                           <button
                             onClick={() => onDownload(file)}
                             className="p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-all"

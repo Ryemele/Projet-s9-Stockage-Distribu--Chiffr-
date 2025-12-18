@@ -175,11 +175,31 @@ class ApiService {
         return newFile;
       }
 
-      const response = await this.api.post<EncryptedFile>(
-        "/files/upload",
-        dataOrEnvelope
+      // Use distributed upload for node-based storage
+      const response = await this.api.post<any>(
+        "/distributed/upload",
+        {
+          encryptedData: dataOrEnvelope.encryptedData,
+          fileName: dataOrEnvelope.fileName,
+          mimeType: dataOrEnvelope.mimeType,
+          size: dataOrEnvelope.fileSize,
+          encryptionMetadata: dataOrEnvelope.encryptionMetadata
+        }
       );
-      return response.data;
+
+      // Map the distributed response to EncryptedFile format
+      const file = response.data.file;
+      return {
+        id: file.id,
+        name: file.name,
+        size: file.size,
+        mimeType: file.mimeType,
+        uploadedAt: new Date().toISOString(),
+        userId: '',
+        encryptedDataUrl: `/api/distributed/download/${file.id}`,
+        iv: dataOrEnvelope.encryptionMetadata?.iv || '',
+        salt: dataOrEnvelope.encryptionMetadata?.salt || ''
+      };
     }
 
     // Legacy format (Blob + metadata)
@@ -223,7 +243,8 @@ class ApiService {
     if (this.USE_LOCAL_STORAGE) {
       return this.localDownloadFile(fileId);
     }
-    const response = await this.api.get(`/files/${fileId}/download`, {
+    // Use distributed download endpoint for files stored on storage nodes
+    const response = await this.api.get(`/distributed/download/${fileId}`, {
       responseType: "blob",
     });
     return response.data;

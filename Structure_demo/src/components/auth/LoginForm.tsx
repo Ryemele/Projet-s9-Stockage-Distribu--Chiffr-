@@ -22,7 +22,13 @@ export const LoginForm: React.FC = () => {
 
     try {
       await login({ email, password });
-      navigate('/home');
+      // Redirect admin to admin panel, regular users to home
+      const user = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      if (user?.role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/home');
+      }
     } catch (err: any) {
       setError(err.message || 'Login failed. Please check your credentials.');
     } finally {

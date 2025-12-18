@@ -197,6 +197,8 @@ router.get('/shared', authenticateToken, async (req: Request, res: Response) => 
         const userEmail = (req as AuthRequest).user?.email;
         const db = getDB();
 
+        console.log(`[Shared] Fetching shared files for ${userEmail}`);
+
         const shares = await db.all(`
       SELECT s.*, f.name as file_name, f.size as file_size, f.mime_type, f.iv, f.salt,
              u.public_key as owner_public_key, u.email as owner_email
@@ -205,6 +207,8 @@ router.get('/shared', authenticateToken, async (req: Request, res: Response) => 
       JOIN users u ON f.user_id = u.id
       WHERE s.shared_with = ?
     `, [userEmail]);
+
+        console.log(`[Shared] Found ${shares.length} shares for ${userEmail}`);
 
         res.json(shares.map((s: any) => {
             // Parse owner's public key
@@ -226,6 +230,7 @@ router.get('/shared', authenticateToken, async (req: Request, res: Response) => 
                 fileName: s.file_name,
                 fileSize: s.file_size,
                 mimeType: s.mime_type,
+                iv: s.iv,  // Encryption metadata for PRE decryption
                 ownerPublicKey: ownerPublicKey,
                 ownerEmail: s.owner_email
             };
@@ -340,8 +345,11 @@ router.post('/:id/share', authenticateToken, async (req: Request, res: Response)
         const { email, encryptedKey } = req.body;
         const db = getDB();
 
+        console.log(`[Share] Sharing file ${req.params.id} with ${email}`);
+
         const file = await db.get('SELECT * FROM files WHERE id = ? AND user_id = ?', [req.params.id, userId]);
         if (!file) {
+            console.log(`[Share] File not found or not owned by user ${userId}`);
             return res.status(404).json({ message: 'File not found' });
         }
 
@@ -351,6 +359,8 @@ router.post('/:id/share', authenticateToken, async (req: Request, res: Response)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
             [shareId, file.id, userId, email, encryptedKey, 'read', new Date().toISOString()]
         );
+
+        console.log(`[Share] Created share ${shareId} for ${email}`);
 
         res.status(201).json({
             id: shareId,

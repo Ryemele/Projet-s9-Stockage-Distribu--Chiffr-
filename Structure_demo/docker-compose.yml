@@ -1,23 +1,31 @@
 version: '3.8'
 
 services:
-  # Gateway Server (existing backend)
+  # Gateway Server (main backend)
   gateway:
     build: ./server
     ports:
       - "3000:3000"
     environment:
-      - JWT_SECRET=${JWT_SECRET}
+      - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
       - PORT=3000
+      - NODE_ENV=development
     depends_on:
-      - node1
-      - node2
-      - node3
-      - node4
-      - node5
-      - node6
+      node1:
+        condition: service_healthy
+      node2:
+        condition: service_healthy
+      node3:
+        condition: service_healthy
+      node4:
+        condition: service_healthy
+      node5:
+        condition: service_healthy
+      node6:
+        condition: service_healthy
     networks:
       - storage-network
+    restart: unless-stopped
 
   # Storage Node 1
   node1:
@@ -27,10 +35,18 @@ services:
     environment:
       - PORT=4001
       - NODE_ID=node-4001
+      - GATEWAY_URL=http://gateway:3000
     volumes:
       - node1-data:/app/data
     networks:
       - storage-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   # Storage Node 2
   node2:
@@ -40,10 +56,18 @@ services:
     environment:
       - PORT=4002
       - NODE_ID=node-4002
+      - GATEWAY_URL=http://gateway:3000
     volumes:
       - node2-data:/app/data
     networks:
       - storage-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4002/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   # Storage Node 3
   node3:
@@ -53,10 +77,18 @@ services:
     environment:
       - PORT=4003
       - NODE_ID=node-4003
+      - GATEWAY_URL=http://gateway:3000
     volumes:
       - node3-data:/app/data
     networks:
       - storage-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4003/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   # Storage Node 4
   node4:
@@ -66,10 +98,18 @@ services:
     environment:
       - PORT=4004
       - NODE_ID=node-4004
+      - GATEWAY_URL=http://gateway:3000
     volumes:
       - node4-data:/app/data
     networks:
       - storage-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4004/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   # Storage Node 5
   node5:
@@ -79,10 +119,18 @@ services:
     environment:
       - PORT=4005
       - NODE_ID=node-4005
+      - GATEWAY_URL=http://gateway:3000
     volumes:
       - node5-data:/app/data
     networks:
       - storage-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4005/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   # Storage Node 6
   node6:
@@ -92,20 +140,31 @@ services:
     environment:
       - PORT=4006
       - NODE_ID=node-4006
+      - GATEWAY_URL=http://gateway:3000
     volumes:
       - node6-data:/app/data
     networks:
       - storage-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4006/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
-  # Frontend (optional)
+  # Frontend
   frontend:
     build: .
     ports:
       - "5173:5173"
+    environment:
+      - VITE_API_URL=https://localhost:3000
     depends_on:
       - gateway
     networks:
       - storage-network
+    restart: unless-stopped
 
 networks:
   storage-network:

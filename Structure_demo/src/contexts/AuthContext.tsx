@@ -159,34 +159,42 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         );
       console.log("[Auth] Password key derived");
 
-      // 4. Load key pair from storage
-      const keyPair = await keyStorageService.getKeyPair(
-        credentials.email,
-        passwordKey
-      );
+      // 4. Load key pair from storage (skip for admin users)
+      let keyPair = null;
+      const isAdminUser = response.user.role === 'admin';
 
-      if (!keyPair) {
-        throw new Error("Key pair not found. Please contact support.");
+      if (!isAdminUser) {
+        keyPair = await keyStorageService.getKeyPair(
+          credentials.email,
+          passwordKey
+        );
+
+        if (!keyPair) {
+          throw new Error("Key pair not found. Please contact support.");
+        }
+        console.log("[Auth] Key pair loaded");
+      } else {
+        console.log("[Auth] Admin user - skipping key pair (monitoring only)");
       }
-
-      console.log("[Auth] Key pair loaded");
 
       localStorage.setItem("authToken", response.token);
       localStorage.setItem("currentUser", JSON.stringify(response.user));
 
       // Serialize keyPair to sessionStorage for persistence during page reload
-      const serializableKeyPair = {
-        email: keyPair.email,
-        privateKey: {
-          u1: keyPair.privateKey.u1.toString(),
-          u2: keyPair.privateKey.u2.toString()
-        },
-        publicKey: {
-          u1: Array.from(keyPair.publicKey.u1),
-          u2: Array.from(keyPair.publicKey.u2)
-        }
-      };
-      sessionStorage.setItem("sessionKeyPair", JSON.stringify(serializableKeyPair));
+      if (keyPair) {
+        const serializableKeyPair = {
+          email: keyPair.email,
+          privateKey: {
+            u1: keyPair.privateKey.u1.toString(),
+            u2: keyPair.privateKey.u2.toString()
+          },
+          publicKey: {
+            u1: Array.from(keyPair.publicKey.u1),
+            u2: Array.from(keyPair.publicKey.u2)
+          }
+        };
+        sessionStorage.setItem("sessionKeyPair", JSON.stringify(serializableKeyPair));
+      }
 
       setAuthState({
         user: response.user,

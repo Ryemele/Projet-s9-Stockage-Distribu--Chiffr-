@@ -360,8 +360,17 @@ class ErasureService {
     decode(encodedData: EncodedData, availableShards: (Shard | null)[]): Buffer {
         const data = this.rs.decode(availableShards, encodedData.originalSize);
 
+        // Debug logging
+        console.log(`[ErasureService] Decode debug:`);
+        console.log(`  - Original size expected: ${encodedData.originalSize}`);
+        console.log(`  - Decoded data size: ${data.length}`);
+        console.log(`  - Expected checksum: ${encodedData.checksum}`);
+
         // Verify checksum
         const actualChecksum = crypto.createHash('sha256').update(data).digest('hex');
+        console.log(`  - Actual checksum: ${actualChecksum}`);
+        console.log(`  - Match: ${actualChecksum === encodedData.checksum}`);
+
         if (actualChecksum !== encodedData.checksum) {
             throw new Error('Data integrity check failed after decode');
         }

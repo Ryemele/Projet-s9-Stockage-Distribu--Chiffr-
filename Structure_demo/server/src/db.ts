@@ -18,7 +18,8 @@ export const initDB = async () => {
       password_hash TEXT,
       name TEXT,
       public_key TEXT,
-      created_at TEXT
+      created_at TEXT,
+      role TEXT DEFAULT 'user'
     );
 
     -- Files table (updated for distributed storage)
@@ -53,6 +54,57 @@ export const initDB = async () => {
       FOREIGN KEY(shared_by) REFERENCES users(id)
     );
 
+    -- Folders table
+    CREATE TABLE IF NOT EXISTS folders (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      parent_id TEXT,
+      color TEXT DEFAULT '#6366f1',
+      created_at TEXT,
+      updated_at TEXT,
+      FOREIGN KEY(user_id) REFERENCES users(id),
+      FOREIGN KEY(parent_id) REFERENCES folders(id)
+    );
+
+    -- Teams table
+    CREATE TABLE IF NOT EXISTS teams (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT,
+      owner_id TEXT NOT NULL,
+      avatar_color TEXT DEFAULT '#6366f1',
+      created_at TEXT,
+      FOREIGN KEY(owner_id) REFERENCES users(id)
+    );
+
+    -- Team members table
+    CREATE TABLE IF NOT EXISTS team_members (
+      id TEXT PRIMARY KEY,
+      team_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      role TEXT DEFAULT 'member',
+      joined_at TEXT,
+      FOREIGN KEY(team_id) REFERENCES teams(id),
+      FOREIGN KEY(user_id) REFERENCES users(id),
+      UNIQUE(team_id, user_id)
+    );
+
+    -- Team files table
+    CREATE TABLE IF NOT EXISTS team_files (
+      id TEXT PRIMARY KEY,
+      team_id TEXT NOT NULL,
+      file_id TEXT NOT NULL,
+      shared_by TEXT NOT NULL,
+      shared_at TEXT,
+      FOREIGN KEY(team_id) REFERENCES teams(id),
+      FOREIGN KEY(file_id) REFERENCES files(id),
+      FOREIGN KEY(shared_by) REFERENCES users(id)
+    );
+
+    -- Add folder_id to files table (will silently fail if already exists)
+    -- ALTER TABLE files ADD COLUMN folder_id TEXT REFERENCES folders(id);
+
     -- Storage nodes registry
     CREATE TABLE IF NOT EXISTS storage_nodes (
       id TEXT PRIMARY KEY,
@@ -86,6 +138,23 @@ export const initDB = async () => {
     CREATE INDEX IF NOT EXISTS idx_shards_file_id ON shards(file_id);
     CREATE INDEX IF NOT EXISTS idx_shards_node_id ON shards(node_id);
   `);
+
+  // Migrations for existing databases - add missing columns
+  try {
+    await db.exec(`ALTER TABLE files ADD COLUMN checksum TEXT`);
+  } catch { /* Column already exists */ }
+
+  try {
+    await db.exec(`ALTER TABLE files ADD COLUMN is_chunked INTEGER DEFAULT 0`);
+  } catch { /* Column already exists */ }
+
+  try {
+    await db.exec(`ALTER TABLE files ADD COLUMN total_chunks INTEGER`);
+  } catch { /* Column already exists */ }
+
+  try {
+    await db.exec(`ALTER TABLE files ADD COLUMN total_shards INTEGER`);
+  } catch { /* Column already exists */ }
 
   console.log('Database initialized with distributed storage schema');
   return db;

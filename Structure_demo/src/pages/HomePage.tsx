@@ -3,16 +3,19 @@ import { useNavigate } from "react-router-dom";
 import {
   Upload,
   FileIcon,
-  Plus,
   HardDrive,
 } from "lucide-react";
 import type { EncryptedFile } from "../types";
 import { FileTable } from "../components/files/FileTable";
+import { ClusterDashboard } from "../components/cluster/ClusterDashboard";
 import { apiService } from "../services/apiService";
 import { calculateStorageByCategory } from "../utils/fileCategories";
+import { useAuth } from "../contexts/AuthContext";
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const [isDragging, setIsDragging] = useState(false);
   const [recentFiles, setRecentFiles] = useState<EncryptedFile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,11 +69,11 @@ export const HomePage: React.FC = () => {
     }
   };
 
-  const handleDownloadFile = (file: EncryptedFile) => {
+  const handleDownloadFile = (_file: EncryptedFile) => {
     navigate("/files"); // Redirect to files page for download
   };
 
-  const handleShareFile = (file: EncryptedFile) => {
+  const handleShareFile = (_file: EncryptedFile) => {
     navigate("/files"); // Redirect to files page for sharing
   };
 
@@ -103,8 +106,8 @@ export const HomePage: React.FC = () => {
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         className={`relative overflow-hidden rounded-xl transition-all duration-300 ${isDragging
-            ? "bg-primary-50 border-2 border-primary-400 border-dashed"
-            : "bg-gradient-to-br from-primary-600 via-primary-500 to-secondary-400"
+          ? "bg-primary-50 border-2 border-primary-400 border-dashed"
+          : "bg-gradient-to-br from-primary-600 via-primary-500 to-secondary-400"
           }`}
       >
         <div className="relative z-10 px-6 py-6">
@@ -242,6 +245,9 @@ export const HomePage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Storage Cluster Status - Admin Only */}
+      {isAdmin && <ClusterDashboard />}
 
       {/* Recent Files Section */}
       <div>

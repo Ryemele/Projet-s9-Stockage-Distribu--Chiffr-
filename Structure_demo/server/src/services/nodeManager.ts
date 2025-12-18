@@ -274,48 +274,101 @@ class NodeManager {
     }
 
     /**
-     * Distribute shards across nodes
+     * Distribute shards across nodes with replication
+     * Each shard is stored on 2 different nodes for fault tolerance
+     * This allows recovery even if multiple nodes fail
      */
     async distributeShards(shards: Shard[]): Promise<ChunkPlacement[]> {
-        const nodes = this.selectNodesForShards(shards.length);
-        const placements: ChunkPlacement[] = [];
+        const REPLICATION_FACTOR = 2; // Store each shard on 2 nodes
+        const online = this.getOnlineNodes();
 
-        for (let i = 0; i < shards.length; i++) {
-            const shard = shards[i];
-            const node = nodes[i % nodes.length];
-
-            const placement = await this.storeShard(node, shard);
-            placements.push(placement);
+        if (online.length < 2) {
+            throw new Error(`Not enough online nodes: need at least 2, have ${online.length}`);
         }
 
-        console.log(`[NodeManager] Distributed ${shards.length} shards across ${nodes.length} nodes`);
+        const placements: ChunkPlacement[] = [];
+
+        // Distribute each shard to multiple nodes
+        for (let i = 0; i < shards.length; i++) {
+            const shard = shards[i];
+
+            // Select 2 different nodes for this shard
+            // Use modulo to spread across nodes, offset by 1 for second replica
+            const primaryNodeIndex = i % online.length;
+            const secondaryNodeIndex = (i + 1) % online.length;
+
+            const nodesToStore = [
+                online[primaryNodeIndex],
+                online[secondaryNodeIndex]
+            ];
+
+            // Store on both nodes
+            for (const node of nodesToStore) {
+                try {
+                    const placement = await this.storeShard(node, shard);
+                    placements.push(placement);
+                } catch (error) {
+                    console.error(`[NodeManager] Failed to store shard ${i} on ${node.id}, trying next node`);
+                    // Continue with other nodes if one fails
+                }
+            }
+        }
+
+        const uniqueNodes = new Set(placements.map(p => p.nodeId)).size;
+        console.log(`[NodeManager] Distributed ${shards.length} shards (${placements.length} copies) across ${uniqueNodes} nodes`);
+        console.log(`[NodeManager] Replication factor: ${REPLICATION_FACTOR}x - can tolerate ${Math.min(shards.length, uniqueNodes - 1)} node failures`);
+
         return placements;
     }
 
     /**
-     * Collect shards from nodes
+     * Collect shards from nodes with replica fallback
+     * With replication, each shard may exist on multiple nodes
+     * Try each replica until we get the data
      */
     async collectShards(placements: ChunkPlacement[]): Promise<(Shard | null)[]> {
-        const shards: (Shard | null)[] = new Array(placements.length).fill(null);
+        // Group placements by shard index (since each shard has replicas)
+        const shardPlacements: Map<number, ChunkPlacement[]> = new Map();
+        for (const placement of placements) {
+            const existing = shardPlacements.get(placement.shardIndex) || [];
+            existing.push(placement);
+            shardPlacements.set(placement.shardIndex, existing);
+        }
 
-        await Promise.all(placements.map(async (placement, index) => {
-            try {
-                const data = await this.retrieveShard(placement.nodeUrl, placement.chunkId);
-                shards[placement.shardIndex] = {
-                    id: placement.chunkId,
-                    index: placement.shardIndex,
-                    isData: placement.shardIndex < 4, // RS(4,2)
-                    data,
-                    size: data.length
-                };
-            } catch (error) {
-                console.warn(`[NodeManager] Failed to retrieve shard ${placement.shardIndex} from ${placement.nodeId}`);
-                shards[placement.shardIndex] = null;
+        // Determine max shard index
+        const maxIndex = Math.max(...Array.from(shardPlacements.keys())) + 1;
+        const shards: (Shard | null)[] = new Array(maxIndex).fill(null);
+        let retrievedCount = 0;
+        let failedNodes: string[] = [];
+
+        // For each unique shard, try to retrieve from any available replica
+        await Promise.all(Array.from(shardPlacements.entries()).map(async ([shardIndex, replicas]) => {
+            for (const placement of replicas) {
+                try {
+                    const data = await this.retrieveShard(placement.nodeUrl, placement.chunkId);
+                    shards[shardIndex] = {
+                        id: placement.chunkId,
+                        index: shardIndex,
+                        isData: shardIndex < 4, // RS(4,2)
+                        data,
+                        size: data.length
+                    };
+                    retrievedCount++;
+                    console.log(`[NodeManager] ✓ Retrieved shard ${shardIndex} from ${placement.nodeId}`);
+                    return; // Got the shard, no need to try other replicas
+                } catch (error) {
+                    console.warn(`[NodeManager] ✗ Failed to get shard ${shardIndex} from ${placement.nodeId}, trying replica...`);
+                    failedNodes.push(placement.nodeId);
+                }
             }
+            // If we get here, all replicas failed for this shard
+            console.error(`[NodeManager] ✗ All replicas failed for shard ${shardIndex}`);
         }));
 
-        const retrieved = shards.filter(s => s !== null).length;
-        console.log(`[NodeManager] Retrieved ${retrieved}/${placements.length} shards`);
+        console.log(`[NodeManager] Retrieved ${retrievedCount}/${maxIndex} unique shards`);
+        if (failedNodes.length > 0) {
+            console.log(`[NodeManager] Failed nodes: ${[...new Set(failedNodes)].join(', ')}`);
+        }
 
         return shards;
     }

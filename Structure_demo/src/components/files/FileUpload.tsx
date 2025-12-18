@@ -136,24 +136,16 @@ export const FileUpload: React.FC<{
             envelope,
           });
 
-          // Convert base64 encrypted data to Blob for Multipart upload
-          const byteCharacters = atob(envelope.encryptedData);
-          const byteNumbers = new Array(byteCharacters.length);
-          for (let i = 0; i < byteCharacters.length; i++) {
-            byteNumbers[i] = byteCharacters.charCodeAt(i);
-          }
-          const byteArray = new Uint8Array(byteNumbers);
-          const blob = new Blob([byteArray], { type: 'application/octet-stream' });
-
-          // Upload to server using Multipart format
-          // We store the full encryption metadata in the 'iv' field since the backend expects 'iv' and 'salt'
-          // and our crypto service uses a complex metadata object.
-          await apiService.uploadFile(blob, {
-            name: envelope.fileName,
-            size: envelope.fileSize,
+          // Upload envelope to server for distributed storage
+          // The envelope format triggers the distributed upload path
+          await apiService.uploadFile({
+            fileId: envelope.fileId,
+            fileName: envelope.fileName,
+            fileSize: envelope.fileSize,
             mimeType: envelope.mimeType,
-            iv: JSON.stringify(envelope.encryptionMetadata),
-            salt: 'unused' // Salt is included in encryptionMetadata if needed, or unused for Level 2
+            encryptedData: envelope.encryptedData,
+            encryptionMetadata: envelope.encryptionMetadata,
+            timestamp: envelope.timestamp
           });
 
           console.log(`[Upload] Upload complete for: ${file.name}`);
