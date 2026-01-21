@@ -1,21 +1,19 @@
 import React, { useState, useRef } from "react";
 import { useAuth } from "../../contexts/AuthContext";
-import {
-  mockCryptoService,
-  type MockFileEnvelope,
-} from "../../services/mockCryptoService";
+import { afghFileService } from "../../services/crypto/afghFileService";
+import type { AFGHFileEnvelope } from "../../types/afgh";
 import { apiService } from "../../services/apiService";
 import { Alert } from "../ui";
-import { Upload, File, X, Shield } from "lucide-react";
+import { Upload, File, X, Lock } from "lucide-react";
 
 /**
- * Enhanced File Upload Component
+ * Enhanced File Upload Component with AFGH Encryption
  *
  * Features:
- * - File encryption simulation
+ * - Real AFGH (BLS12-381) encryption
+ * - AES-256-GCM for file chunks
  * - Progress tracking per file
- * - UI testing ready
- * - Will be integrated with pyUmbrel for real encryption
+ * - End-to-end encryption
  */
 
 interface UploadingFile {
@@ -24,7 +22,7 @@ interface UploadingFile {
   progress: number;
   statusMessage: string;
   error?: string;
-  envelope?: MockFileEnvelope;
+  envelope?: AFGHFileEnvelope;
 }
 
 export const FileUploadEnhanced: React.FC<{
@@ -39,7 +37,7 @@ export const FileUploadEnhanced: React.FC<{
   const [success, setSuccess] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { masterKey, keyPair } = useAuth();
+  const { keyPair } = useAuth();
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -86,8 +84,8 @@ export const FileUploadEnhanced: React.FC<{
   };
 
   const handleUpload = async () => {
-    if (!masterKey || !keyPair) {
-      setError("Keys not available. Please log in again.");
+    if (!keyPair) {
+      setError("Encryption keys not available. Please log in again.");
       return;
     }
 
@@ -104,16 +102,16 @@ export const FileUploadEnhanced: React.FC<{
       // Upload files sequentially
       for (const file of selectedFiles) {
         try {
-          console.log(`[Upload] Starting encryption for: ${file.name}`);
+          console.log(`[Upload] Starting AFGH encryption for: ${file.name}`);
 
           updateFileStatus(file.name, {
             status: "encrypting",
-            statusMessage: "Starting encryption...",
+            statusMessage: "Generating encryption keys...",
             progress: 0,
           });
 
-          // Encrypt file with mock service
-          const envelope = await mockCryptoService.encryptFile(
+          // Encrypt file with AFGH service (real encryption!)
+          const envelope = await afghFileService.encryptFile(
             file,
             keyPair,
             (progress, status) => {
@@ -125,35 +123,38 @@ export const FileUploadEnhanced: React.FC<{
             }
           );
 
-          console.log(
-            `[Upload] Encryption complete. File ID: ${envelope.fileId}`
-          );
+          console.log(`[Upload] AFGH encryption complete. File ID: ${envelope.fileId}`);
 
           updateFileStatus(file.name, {
             status: "uploading",
-            statusMessage: "Uploading to server...",
+            statusMessage: "Uploading encrypted file...",
             progress: 95,
             envelope,
           });
 
-          // Convert envelope for API (simplified)
-          const uploadData = {
-            fileId: envelope.fileId,
-            fileName: envelope.fileName,
-            fileSize: envelope.fileSize,
-            mimeType: envelope.mimeType,
-            encryptedData: envelope.encryptedData,
-            timestamp: envelope.timestamp,
-          };
+          // Serialize envelope and upload first chunk to server
+          const serializedEnvelope = afghFileService.serializeEnvelope(envelope);
 
-          // Upload to server
-          await apiService.uploadFile(uploadData);
+          // Create a Blob from the serialized envelope for upload
+          const encryptedBlob = new Blob([serializedEnvelope], { type: 'application/json' });
+
+          // Upload to server using FormData
+          const formData = new FormData();
+          formData.append('file', encryptedBlob, `${envelope.fileName}.encrypted`);
+
+          await apiService.uploadFile(encryptedBlob, {
+            name: envelope.fileName,
+            size: envelope.fileSize,
+            mimeType: envelope.mimeType,
+            iv: envelope.wrapKeyIV,
+            salt: envelope.kdfSalt ? btoa(String.fromCharCode(...envelope.kdfSalt)) : '',
+          });
 
           console.log(`[Upload] Upload complete for: ${file.name}`);
 
           updateFileStatus(file.name, {
             status: "completed",
-            statusMessage: "Upload complete!",
+            statusMessage: "Encrypted & uploaded!",
             progress: 100,
           });
         } catch (fileError) {
@@ -161,13 +162,12 @@ export const FileUploadEnhanced: React.FC<{
           updateFileStatus(file.name, {
             status: "error",
             statusMessage: "Upload failed",
-            error:
-              fileError instanceof Error ? fileError.message : "Unknown error",
+            error: fileError instanceof Error ? fileError.message : "Unknown error",
           });
         }
       }
 
-      setSuccess(`Successfully uploaded ${selectedFiles.length} file(s)`);
+      setSuccess(`Successfully encrypted and uploaded ${selectedFiles.length} file(s)`);
       setSelectedFiles([]);
 
       if (onUploadComplete) {
@@ -206,15 +206,16 @@ export const FileUploadEnhanced: React.FC<{
   return (
     <div className="space-y-6">
       {/* Encryption Info */}
-      <div className="bg-primary-50/50 border border-blue-100 rounded-lg p-4">
+      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
         <div className="flex items-start gap-3">
-          <div className="w-9 h-9 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-            <Shield className="w-5 h-5 text-primary-600" />
+          <div className="w-9 h-9 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
+            <Lock className="w-5 h-5 text-green-600" />
           </div>
           <div className="flex-1">
-            <h3 className="font-medium text-gray-900">End-to-end encrypted</h3>
+            <h3 className="font-medium text-gray-900">AFGH End-to-End Encryption</h3>
             <p className="text-sm text-gray-600 mt-0.5">
-              Your files are encrypted before upload. Only you can decrypt them.
+              Files are encrypted with AES-256-GCM + BLS12-381 Proxy Re-Encryption.
+              Only you (and those you share with) can decrypt them.
             </p>
           </div>
         </div>

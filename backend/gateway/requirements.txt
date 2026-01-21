@@ -1,8 +1,10 @@
 fastapi
 uvicorn[standard]
-SQLAlchemy
+sqlalchemy
 psycopg2-binary
-Werkzeug
+werkzeug
 python-jose[cryptography]
 requests
 python-multipart
+python-dotenv
+minio

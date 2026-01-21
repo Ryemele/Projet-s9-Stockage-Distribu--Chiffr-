@@ -3,9 +3,10 @@ import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:0000@localhost:5432/storage")
+# Utilise psycopg3 (postgresql+psycopg)
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+psycopg://postgres:postgres123@localhost:5432/storage")
 
-engine = create_engine(DATABASE_URL)
+engine = create_engine(DATABASE_URL, echo=False)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

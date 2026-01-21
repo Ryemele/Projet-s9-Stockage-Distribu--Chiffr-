@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import axios, { type AxiosInstance } from "axios";
-import { mockCryptoService } from "./mockCryptoService";
+import { cryptoService } from "./cryptoService";
+import { sanitizationService } from "./sanitizationService";
 import type {
   User,
   LoginCredentials,
@@ -11,18 +12,46 @@ import type {
 } from "../types";
 
 /**
- * API Service - Handles all HTTP requests to the backend
- * This is a mock implementation that uses localStorage for demonstration
- * In production, replace with actual API calls
+ * API Service - Handles all HTTP requests to the backend gateway
+ * Uses real backend with distributed storage and erasure coding
  */
+
+// Cluster status response type
+export interface ClusterStatus {
+  total_nodes: number;
+  online_nodes: number;
+  offline_nodes: number;
+  healthy: boolean;
+  erasure_coding: {
+    data_shards: number;
+    parity_shards: number;
+    fault_tolerance: number;
+  };
+  can_accept_uploads: boolean;
+}
+
+// File recovery status type
+export interface FileRecoveryStatus {
+  file_id: string;
+  filename: string;
+  status: 'healthy' | 'degraded' | 'critical';
+  available_shards: number;
+  required_shards: number;
+  total_shards: number;
+  can_recover: boolean;
+}
 
 class ApiService {
   private api: AxiosInstance;
-  private readonly USE_MOCK = true; // Set to false when backend is ready
+
+  // Rate Limiting State
+  private rateLimits: Record<string, number[]> = {};
+  private readonly RATE_LIMIT_WINDOW = 60000; // 1 minute
+  private readonly MAX_REQUESTS = 30; // 30 requests per minute
 
   constructor() {
     this.api = axios.create({
-      baseURL: import.meta.env.VITE_API_URL || "http://localhost:3000/api",
+      baseURL: import.meta.env.VITE_API_URL || "http://localhost:8000/api",
       headers: {
         "Content-Type": "application/json",
       },
@@ -36,67 +65,127 @@ class ApiService {
       }
       return config;
     });
+
+    // Handle errors globally
+    this.api.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response?.status === 401) {
+          localStorage.removeItem("authToken");
+          localStorage.removeItem("currentUser");
+        }
+        return Promise.reject(error);
+      }
+    );
+  }
+
+  // ==================== Rate Limiting ====================
+
+  private checkRateLimit(action: string): boolean {
+    const now = Date.now();
+    if (!this.rateLimits[action]) {
+      this.rateLimits[action] = [];
+    }
+
+    this.rateLimits[action] = this.rateLimits[action].filter(
+      (timestamp) => now - timestamp < this.RATE_LIMIT_WINDOW
+    );
+
+    if (this.rateLimits[action].length >= this.MAX_REQUESTS) {
+      return false;
+    }
+
+    this.rateLimits[action].push(now);
+    return true;
+  }
+
+  // ==================== Helpers ====================
+
+  private adaptUser(backendUser: any): User {
+    return {
+      id: backendUser.user_id || backendUser.id,
+      email: backendUser.email,
+      name: backendUser.name,
+      createdAt: backendUser.created_at || backendUser.createdAt,
+      publicKey: backendUser.public_key || backendUser.publicKey,
+    };
+  }
+
+  private adaptFile(backendFile: any): EncryptedFile {
+    return {
+      id: backendFile.file_id || backendFile.id,
+      name: backendFile.filename || backendFile.name,
+      size: backendFile.size_bytes || backendFile.size,
+      mimeType: backendFile.mime_type || backendFile.mimeType || 'application/octet-stream',
+      uploadedAt: backendFile.created_at || backendFile.uploadedAt,
+      userId: backendFile.owner_id || backendFile.userId,
+      encryptedDataUrl: '',
+      iv: backendFile.iv || '',
+      salt: backendFile.salt || '',
+      isChunked: backendFile.is_chunked || false,
+      checksum: backendFile.checksum || '',
+    };
   }
 
   // ==================== Auth APIs ====================
 
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
-    if (this.USE_MOCK) {
-      return this.mockLogin(credentials);
+    if (!this.checkRateLimit('login')) {
+      throw new Error("Too many login attempts. Please try again later.");
     }
-    const response = await this.api.post<AuthResponse>(
-      "/auth/login",
-      credentials
-    );
-    return response.data;
+
+    const response = await this.api.post("/auth/login", credentials);
+    const data = response.data;
+    const user = this.adaptUser(data.user);
+
+    localStorage.setItem("authToken", data.token);
+    localStorage.setItem("currentUser", JSON.stringify(user));
+
+    return { user, token: data.token };
   }
 
   async register(credentials: RegisterCredentials): Promise<AuthResponse> {
-    if (this.USE_MOCK) {
-      return this.mockRegister(credentials);
+    if (!this.checkRateLimit('register')) {
+      throw new Error("Too many registration attempts. Please try again later.");
     }
-    const response = await this.api.post<AuthResponse>(
-      "/auth/register",
-      credentials
-    );
-    return response.data;
+
+    // Sanitize inputs
+    const sanitizedCredentials = {
+      ...credentials,
+      email: sanitizationService.sanitize(credentials.email),
+      name: sanitizationService.sanitize(credentials.name),
+    };
+
+    if (!sanitizationService.isValidEmail(sanitizedCredentials.email)) {
+      throw new Error("Invalid email format");
+    }
+
+    const response = await this.api.post("/auth/register", sanitizedCredentials);
+    const data = response.data;
+    const user = this.adaptUser(data.user);
+
+    localStorage.setItem("authToken", data.token);
+    localStorage.setItem("currentUser", JSON.stringify(user));
+
+    return { user, token: data.token };
   }
 
   async logout(): Promise<void> {
-    if (this.USE_MOCK) {
+    try {
+      await this.api.post("/auth/logout");
+    } finally {
       localStorage.removeItem("authToken");
       localStorage.removeItem("currentUser");
-      return;
     }
-    await this.api.post("/auth/logout");
   }
 
   async getCurrentUser(): Promise<User> {
-    if (this.USE_MOCK) {
-      const userStr = localStorage.getItem("currentUser");
-      if (!userStr) throw new Error("Not authenticated");
-      return JSON.parse(userStr);
-    }
-    const response = await this.api.get<User>("/auth/me");
-    return response.data;
+    const response = await this.api.get("/auth/me");
+    return this.adaptUser(response.data.user || response.data);
   }
 
-  // ==================== File APIs ====================
+  // ==================== Standard File APIs ====================
 
-  // Overload signatures
-  async uploadFile(
-    encryptedData: Blob,
-    metadata: {
-      name: string;
-      size: number;
-      mimeType: string;
-      iv: string;
-      salt: string;
-    }
-  ): Promise<EncryptedFile>;
-  async uploadFile(afghEnvelope: any): Promise<EncryptedFile>;
-
-  // Implementation
   async uploadFile(
     dataOrEnvelope: Blob | any,
     metadata?: {
@@ -107,90 +196,193 @@ class ApiService {
       salt: string;
     }
   ): Promise<EncryptedFile> {
-    // Mock envelope format (single parameter)
+    if (!this.checkRateLimit('upload')) {
+      throw new Error("Upload rate limit exceeded. Please wait.");
+    }
+
+    // Envelope format (encrypted file from cryptoService)
     if (!metadata && typeof dataOrEnvelope === 'object' && 'fileId' in dataOrEnvelope) {
-      if (this.USE_MOCK) {
-        // Mock: Save envelope to localStorage
-        const user = JSON.parse(localStorage.getItem("currentUser") || "{}");
-        const files = JSON.parse(localStorage.getItem("mockFiles") || "[]");
+      // Sanitize file name
+      dataOrEnvelope.fileName = sanitizationService.sanitizeFileName(dataOrEnvelope.fileName);
 
-        const newFile: EncryptedFile = {
-          id: dataOrEnvelope.fileId,
-          name: dataOrEnvelope.fileName,
-          size: dataOrEnvelope.fileSize,
-          mimeType: dataOrEnvelope.mimeType,
-          uploadedAt: new Date().toISOString(),
-          userId: user.id,
-          encryptedDataUrl: mockCryptoService.serializeEnvelope(dataOrEnvelope), // Serialize properly
-          iv: dataOrEnvelope.timestamp, // Use timestamp as IV for simplicity
-          salt: ''
-        };
-
-        files.push(newFile);
-        localStorage.setItem("mockFiles", JSON.stringify(files));
-        console.log('[API Mock] File saved to localStorage:', newFile.id);
-
-        return newFile;
-      }
-
-      // Real API call
-      const response = await this.api.post<EncryptedFile>(
-        "/files/upload",
-        dataOrEnvelope
-      );
-      return response.data;
+      // Use distributed upload for erasure-coded storage
+      return this.uploadDistributed(dataOrEnvelope);
     }
 
-    // Old format (Blob + metadata)
-    if (this.USE_MOCK) {
-      return this.mockUploadFile(dataOrEnvelope as Blob, metadata!);
-    }
-
+    // Blob + metadata format (legacy)
     const formData = new FormData();
     formData.append("file", dataOrEnvelope as Blob);
-    formData.append("metadata", JSON.stringify(metadata));
+    if (metadata) {
+      metadata.name = sanitizationService.sanitizeFileName(metadata.name);
+    }
 
-    const response = await this.api.post<EncryptedFile>(
-      "/files/upload",
-      formData,
-      {
-        headers: { "Content-Type": "multipart/form-data" },
-      }
-    );
-    return response.data;
+    const response = await this.api.post("/files/upload", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+
+    return this.adaptFile(response.data.file || response.data);
   }
 
   async getFiles(): Promise<EncryptedFile[]> {
-    if (this.USE_MOCK) {
-      return this.mockGetFiles();
-    }
-    const response = await this.api.get<EncryptedFile[]>("/files");
-    return response.data;
+    const response = await this.api.get("/files");
+    const files = Array.isArray(response.data) ? response.data : (response.data.files || []);
+    return files.map((f: any) => this.adaptFile(f));
   }
 
   async getFile(fileId: string): Promise<EncryptedFile> {
-    if (this.USE_MOCK) {
-      return this.mockGetFile(fileId);
-    }
-    const response = await this.api.get<EncryptedFile>(`/files/${fileId}`);
-    return response.data;
+    const response = await this.api.get(`/files/${fileId}`);
+    return this.adaptFile(response.data.file || response.data);
   }
 
   async downloadFile(fileId: string): Promise<Blob> {
-    if (this.USE_MOCK) {
-      return this.mockDownloadFile(fileId);
+    // Try distributed download first (for chunked files)
+    try {
+      const file = await this.getFile(fileId);
+      if (file.isChunked) {
+        return this.downloadDistributed(fileId);
+      }
+    } catch {
+      // Fall through to standard download
     }
-    const response = await this.api.get(`/files/${fileId}/download`, {
-      responseType: "blob",
-    });
-    return response.data;
+
+    // Standard download (for non-chunked files)
+    const response = await this.api.get(`/files/${fileId}/download`);
+    const data = response.data;
+
+    // Handle chunked response
+    if (data.chunks && Array.isArray(data.chunks)) {
+      const sortedChunks = data.chunks.sort((a: any, b: any) => a.index - b.index);
+      const blobParts: BlobPart[] = [];
+
+      for (const chunk of sortedChunks) {
+        const binaryString = atob(chunk.data);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        blobParts.push(bytes.buffer as ArrayBuffer);
+      }
+
+      return new Blob(blobParts, { type: data.file?.mime_type || 'application/octet-stream' });
+    }
+
+    // Handle base64 response
+    if (data.data) {
+      const binaryString = atob(data.data);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      return new Blob([bytes], { type: data.file?.mime_type || 'application/octet-stream' });
+    }
+
+    throw new Error("Unexpected response format");
   }
 
   async deleteFile(fileId: string): Promise<void> {
-    if (this.USE_MOCK) {
-      return this.mockDeleteFile(fileId);
-    }
     await this.api.delete(`/files/${fileId}`);
+  }
+
+  // ==================== Distributed Storage APIs ====================
+
+  /**
+   * Upload file with Reed-Solomon erasure coding
+   * File is chunked and each chunk is encoded with RS(4,2)
+   */
+  async uploadDistributed(envelope: any): Promise<EncryptedFile> {
+    // Prepare form data for distributed upload
+    const formData = new FormData();
+
+    // Convert encrypted data to blob
+    const encryptedBytes = cryptoService.base64ToUint8Array(envelope.encryptedData);
+    // Create a new ArrayBuffer copy to ensure type compatibility
+    const arrayBuffer = new ArrayBuffer(encryptedBytes.length);
+    new Uint8Array(arrayBuffer).set(encryptedBytes);
+    const encryptedBlob = new Blob([arrayBuffer], { type: envelope.mimeType });
+
+    formData.append("file", encryptedBlob, envelope.fileName);
+
+    // Include encryption metadata for later decryption
+    const metadataJson = JSON.stringify({
+      encryptionMetadata: envelope.encryptionMetadata,
+      originalSize: envelope.fileSize,
+    });
+    formData.append("encryption_metadata", metadataJson);
+
+    const response = await this.api.post("/files/upload-distributed", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+
+    const result = response.data;
+    return {
+      id: result.file.file_id,
+      name: result.file.filename,
+      size: result.file.size_bytes,
+      mimeType: result.file.mime_type,
+      uploadedAt: result.file.created_at,
+      userId: result.file.owner_id,
+      encryptedDataUrl: '',
+      iv: '',
+      salt: '',
+      isChunked: true,
+      checksum: result.file.checksum,
+      erasureCoding: result.erasure_coding,
+    };
+  }
+
+  /**
+   * Download file with automatic Reed-Solomon recovery
+   */
+  async downloadDistributed(fileId: string): Promise<Blob> {
+    const response = await this.api.get(`/files/${fileId}/download-distributed`);
+    const data = response.data;
+
+    if (!data.data) {
+      throw new Error("No data in response");
+    }
+
+    // Decode base64 data
+    const binaryString = atob(data.data);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+
+    return new Blob([bytes], { type: data.file?.mime_type || 'application/octet-stream' });
+  }
+
+  /**
+   * Get file recovery status (health of shards across nodes)
+   */
+  async getFileRecoveryStatus(fileId: string): Promise<FileRecoveryStatus> {
+    const response = await this.api.get(`/files/${fileId}/recovery-status`);
+    return response.data;
+  }
+
+  /**
+   * Trigger file recovery if shards are degraded
+   */
+  async recoverFile(fileId: string): Promise<{ success: boolean; message: string }> {
+    const response = await this.api.post(`/files/${fileId}/recover`);
+    return response.data;
+  }
+
+  // ==================== Cluster APIs ====================
+
+  /**
+   * Get cluster health status
+   */
+  async getClusterStatus(): Promise<ClusterStatus> {
+    const response = await this.api.get("/cluster/status");
+    return response.data;
+  }
+
+  /**
+   * Get list of storage nodes
+   */
+  async getClusterNodes(): Promise<any[]> {
+    const response = await this.api.get("/cluster/nodes");
+    return response.data.nodes || [];
   }
 
   // ==================== Sharing APIs ====================
@@ -200,254 +392,47 @@ class ApiService {
     email: string,
     encryptedKey: string
   ): Promise<FileShare> {
-    if (this.USE_MOCK) {
-      return this.mockShareFile(fileId, email, encryptedKey);
+    if (!this.checkRateLimit('share')) {
+      throw new Error("Share rate limit exceeded. Please wait.");
     }
-    const response = await this.api.post<FileShare>(`/files/${fileId}/share`, {
-      email,
-      encryptedKey,
+
+    const sanitizedEmail = sanitizationService.sanitize(email);
+
+    if (!sanitizationService.isValidEmail(sanitizedEmail)) {
+      throw new Error("Invalid email format");
+    }
+
+    const response = await this.api.post(`/files/${fileId}/share`, {
+      email: sanitizedEmail,
+      encrypted_key: encryptedKey,
     });
+
     return response.data;
   }
 
   async getSharedFiles(): Promise<FileShare[]> {
-    if (this.USE_MOCK) {
-      return this.mockGetSharedFiles();
-    }
-    const response = await this.api.get<FileShare[]>("/files/shared");
+    const response = await this.api.get("/files/shared");
+    const shares = Array.isArray(response.data) ? response.data : (response.data.shares || []);
+    return shares;
+  }
+
+  async getUserPublicKey(email: string): Promise<string | { publicKey1: string; publicKey2: string }> {
+    const sanitizedEmail = sanitizationService.sanitize(email);
+    const response = await this.api.get(`/users/${encodeURIComponent(sanitizedEmail)}/public-key`);
+    return response.data.public_key || response.data.publicKey;
+  }
+
+  // ==================== User APIs ====================
+
+  async updatePublicKey(publicKey: string | { publicKey1: string; publicKey2: string }): Promise<void> {
+    await this.api.put("/auth/public-key", { public_key: publicKey });
+  }
+
+  // ==================== Health Check ====================
+
+  async healthCheck(): Promise<{ status: string; minio: boolean }> {
+    const response = await this.api.get("/health");
     return response.data;
-  }
-
-  async getUserPublicKey(email: string): Promise<string> {
-    if (this.USE_MOCK) {
-      return this.mockGetUserPublicKey(email);
-    }
-    const response = await this.api.get<{ publicKey: string }>(
-      `/users/${email}/public-key`
-    );
-    return response.data.publicKey;
-  }
-
-  // ==================== Mock Implementations ====================
-
-  private mockLogin(credentials: LoginCredentials): Promise<AuthResponse> {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        const users = JSON.parse(localStorage.getItem("mockUsers") || "[]");
-        const user = users.find((u: any) => u.email === credentials.email);
-
-        if (!user || user.password !== credentials.password) {
-          reject(new Error("Invalid credentials"));
-          return;
-        }
-
-        const token = "mock-token-" + Date.now();
-        const authUser: User = {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          createdAt: user.createdAt,
-          publicKey: user.publicKey,
-        };
-
-        localStorage.setItem("authToken", token);
-        localStorage.setItem("currentUser", JSON.stringify(authUser));
-
-        resolve({ user: authUser, token });
-      }, 500);
-    });
-  }
-
-  private mockRegister(
-    credentials: RegisterCredentials
-  ): Promise<AuthResponse> {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        const users = JSON.parse(localStorage.getItem("mockUsers") || "[]");
-
-        if (users.find((u: any) => u.email === credentials.email)) {
-          reject(new Error("Email already exists"));
-          return;
-        }
-
-        const newUser = {
-          id: "user-" + Date.now(),
-          email: credentials.email,
-          name: credentials.name,
-          password: credentials.password,
-          createdAt: new Date().toISOString(),
-          publicKey: "",
-        };
-
-        users.push(newUser);
-        localStorage.setItem("mockUsers", JSON.stringify(users));
-
-        const token = "mock-token-" + Date.now();
-        const authUser: User = {
-          id: newUser.id,
-          email: newUser.email,
-          name: newUser.name,
-          createdAt: newUser.createdAt,
-          publicKey: newUser.publicKey,
-        };
-
-        localStorage.setItem("authToken", token);
-        localStorage.setItem("currentUser", JSON.stringify(authUser));
-
-        resolve({ user: authUser, token });
-      }, 500);
-    });
-  }
-
-  private mockUploadFile(
-    encryptedData: Blob,
-    metadata: any
-  ): Promise<EncryptedFile> {
-    return new Promise((resolve) => {
-      setTimeout(async () => {
-        const user = JSON.parse(localStorage.getItem("currentUser") || "{}");
-        const files = JSON.parse(localStorage.getItem("mockFiles") || "[]");
-
-        // Convert blob to base64 for storage
-        const reader = new FileReader();
-        reader.readAsDataURL(encryptedData);
-        reader.onloadend = () => {
-          const base64data = reader.result as string;
-
-          const newFile: EncryptedFile = {
-            id: "file-" + Date.now(),
-            name: metadata.name,
-            size: metadata.size,
-            mimeType: metadata.mimeType,
-            uploadedAt: new Date().toISOString(),
-            userId: user.id,
-            encryptedDataUrl: base64data,
-            iv: metadata.iv,
-            salt: metadata.salt,
-          };
-
-          files.push(newFile);
-          localStorage.setItem("mockFiles", JSON.stringify(files));
-
-          resolve(newFile);
-        };
-      }, 1000);
-    });
-  }
-
-  private mockGetFiles(): Promise<EncryptedFile[]> {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const user = JSON.parse(localStorage.getItem("currentUser") || "{}");
-        const files = JSON.parse(localStorage.getItem("mockFiles") || "[]");
-        const userFiles = files.filter(
-          (f: EncryptedFile) => f.userId === user.id
-        );
-        resolve(userFiles);
-      }, 300);
-    });
-  }
-
-  private mockGetFile(fileId: string): Promise<EncryptedFile> {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        const files = JSON.parse(localStorage.getItem("mockFiles") || "[]");
-        const file = files.find((f: EncryptedFile) => f.id === fileId);
-        if (!file) {
-          reject(new Error("File not found"));
-          return;
-        }
-        resolve(file);
-      }, 300);
-    });
-  }
-
-  private mockDownloadFile(fileId: string): Promise<Blob> {
-    return new Promise((resolve, reject) => {
-      setTimeout(async () => {
-        const files = JSON.parse(localStorage.getItem("mockFiles") || "[]");
-        const file = files.find((f: EncryptedFile) => f.id === fileId);
-
-        if (!file) {
-          reject(new Error("File not found"));
-          return;
-        }
-
-        // Convert base64 back to blob
-        const response = await fetch(file.encryptedDataUrl);
-        const blob = await response.blob();
-        resolve(blob);
-      }, 500);
-    });
-  }
-
-  private mockDeleteFile(fileId: string): Promise<void> {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const files = JSON.parse(localStorage.getItem("mockFiles") || "[]");
-        const updatedFiles = files.filter(
-          (f: EncryptedFile) => f.id !== fileId
-        );
-        localStorage.setItem("mockFiles", JSON.stringify(updatedFiles));
-        resolve();
-      }, 300);
-    });
-  }
-
-  private mockShareFile(
-    fileId: string,
-    email: string,
-    encryptedKey: string
-  ): Promise<FileShare> {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const user = JSON.parse(localStorage.getItem("currentUser") || "{}");
-        const shares = JSON.parse(localStorage.getItem("mockShares") || "[]");
-
-        const newShare: FileShare = {
-          id: "share-" + Date.now(),
-          fileId,
-          sharedBy: user.id,
-          sharedWith: email,
-          sharedAt: new Date().toISOString(),
-          encryptedKey,
-          permissions: "read",
-        };
-
-        shares.push(newShare);
-        localStorage.setItem("mockShares", JSON.stringify(shares));
-        resolve(newShare);
-      }, 500);
-    });
-  }
-
-  private mockGetSharedFiles(): Promise<FileShare[]> {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const user = JSON.parse(localStorage.getItem("currentUser") || "{}");
-        const shares = JSON.parse(localStorage.getItem("mockShares") || "[]");
-        const userShares = shares.filter(
-          (s: FileShare) => s.sharedWith === user.email
-        );
-        resolve(userShares);
-      }, 300);
-    });
-  }
-
-  private mockGetUserPublicKey(email: string): Promise<string> {
-    return new Promise((resolve, reject) => {
-      setTimeout(() => {
-        const users = JSON.parse(localStorage.getItem("mockUsers") || "[]");
-        const user = users.find((u: any) => u.email === email);
-
-        if (!user || !user.publicKey) {
-          reject(new Error("User not found or public key not available"));
-          return;
-        }
-
-        resolve(user.publicKey);
-      }, 300);
-    });
   }
 }
 

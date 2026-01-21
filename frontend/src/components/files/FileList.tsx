@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { apiService } from "../../services/apiService";
-import { mockCryptoService } from "../../services/mockCryptoService";
+import { afghFileService } from "../../services/crypto/afghFileService";
 import { useAuth } from "../../contexts/AuthContext";
 import type { EncryptedFile } from "../../types";
 import { ShareWithTeamModal } from "./ShareWithTeamModal";
@@ -50,13 +50,13 @@ export const FileList: React.FC<{ key?: number }> = () => {
       console.log("[FileList] Fetching encrypted file envelope...");
       const encryptedDataUrl = file.encryptedDataUrl;
 
-      // Désérialiser l'enveloppe
-      const envelope = mockCryptoService.deserializeEnvelope(encryptedDataUrl);
+      // Désérialiser l'enveloppe AFGH
+      const envelope = afghFileService.deserializeEnvelope(encryptedDataUrl);
       console.log("[FileList] Envelope loaded:", envelope.fileId);
 
-      // Déchiffrer le fichier avec le service mock
-      console.log("[FileList] Decrypting file...");
-      const decryptedFile = await mockCryptoService.decryptFile(
+      // Déchiffrer le fichier avec le service AFGH (real encryption!)
+      console.log("[FileList] Decrypting file with AFGH...");
+      const decryptedFile = await afghFileService.decryptFileOwner(
         envelope,
         keyPair,
         (progress, message) => {
@@ -70,14 +70,15 @@ export const FileList: React.FC<{ key?: number }> = () => {
         decryptedFile.fileName
       );
 
-      // Créer un Blob et télécharger
+      // Créer un Blob et télécharger le fichier déchiffré
       const blob = new Blob([decryptedFile.data], {
         type: decryptedFile.mimeType,
       });
+      const decryptedFileName = decryptedFile.fileName;
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = decryptedFile.fileName;
+      a.download = decryptedFileName;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

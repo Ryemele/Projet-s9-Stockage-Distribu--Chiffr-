@@ -1,135 +1,242 @@
+/**
+ * Folders Data Service
+ * Uses real backend API for folder operations
+ */
 import type { Folder } from '../types/folder';
 
-export const mockFolders: Folder[] = [
-  {
-    id: '1',
-    name: 'Work',
-    description: 'Work-related documents and files',
-    color: 'blue',
-    createdAt: new Date('2024-01-15').toISOString(),
-    updatedAt: new Date('2024-03-10').toISOString(),
-    fileCount: 24,
-    size: 15728640,
-    parentFolderId: null,
-  },
-  {
-    id: '2',
-    name: 'Personal',
-    description: 'Personal photos and documents',
-    color: 'purple',
-    createdAt: new Date('2024-01-20').toISOString(),
-    updatedAt: new Date('2024-03-08').toISOString(),
-    fileCount: 12,
-    size: 8388608,
-    parentFolderId: null,
-  },
-  {
-    id: '3',
-    name: 'Photos',
-    description: 'Photo collection',
-    color: 'pink',
-    createdAt: new Date('2024-02-01').toISOString(),
-    updatedAt: new Date('2024-03-12').toISOString(),
-    fileCount: 45,
-    size: 52428800,
-    parentFolderId: null,
-  },
-  {
-    id: '4',
-    name: 'Documents',
-    description: 'Important documents',
-    color: 'green',
-    createdAt: new Date('2024-02-10').toISOString(),
-    updatedAt: new Date('2024-03-05').toISOString(),
-    fileCount: 18,
-    size: 20971520,
-    parentFolderId: null,
-  },
-  // Subfolders of Work (id: 1)
-  {
-    id: 'sub-1-1',
-    name: 'Projects',
-    description: 'Active projects',
-    color: 'green',
-    createdAt: new Date('2024-02-15').toISOString(),
-    updatedAt: new Date('2024-03-11').toISOString(),
-    fileCount: 8,
-    size: 4194304,
-    parentFolderId: '1',
-  },
-  {
-    id: 'sub-1-2',
-    name: 'Archive',
-    description: 'Archived items',
-    color: 'orange',
-    createdAt: new Date('2024-02-20').toISOString(),
-    updatedAt: new Date('2024-03-09').toISOString(),
-    fileCount: 15,
-    size: 10485760,
-    parentFolderId: '1',
-  },
-  // Subfolders of Personal (id: 2)
-  {
-    id: 'sub-2-1',
-    name: 'Family',
-    description: 'Family documents',
-    color: 'purple',
-    createdAt: new Date('2024-02-25').toISOString(),
-    updatedAt: new Date('2024-03-07').toISOString(),
-    fileCount: 6,
-    size: 3145728,
-    parentFolderId: '2',
-  },
-  // Subfolders of Photos (id: 3)
-  {
-    id: 'sub-3-1',
-    name: 'Vacation 2024',
-    description: 'Vacation photos',
-    color: 'yellow',
-    createdAt: new Date('2024-03-01').toISOString(),
-    updatedAt: new Date('2024-03-13').toISOString(),
-    fileCount: 28,
-    size: 31457280,
-    parentFolderId: '3',
-  },
-  {
-    id: 'sub-3-2',
-    name: 'Events',
-    description: 'Event photos',
-    color: 'pink',
-    createdAt: new Date('2024-03-02').toISOString(),
-    updatedAt: new Date('2024-03-14').toISOString(),
-    fileCount: 17,
-    size: 20971520,
-    parentFolderId: '3',
-  },
-];
+// Local cache for reactive UI updates
+let foldersCache: Folder[] = [];
+let cacheInitialized = false;
+
+// API base URL
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+
+// Get auth token
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('authToken');
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+  };
+};
+
+// Initialize cache from API
+const initCache = async (): Promise<void> => {
+  if (!cacheInitialized) {
+    try {
+      const response = await fetch(`${API_URL}/folders`, {
+        headers: getAuthHeaders()
+      });
+      if (response.ok) {
+        foldersCache = await response.json();
+        cacheInitialized = true;
+      }
+    } catch (error) {
+      console.warn('[Folders] API not available, using empty cache');
+      foldersCache = [];
+    }
+  }
+};
+
+// Refresh cache from API
+export const refreshFoldersCache = async (): Promise<Folder[]> => {
+  try {
+    const response = await fetch(`${API_URL}/folders`, {
+      headers: getAuthHeaders()
+    });
+    if (response.ok) {
+      foldersCache = await response.json();
+      cacheInitialized = true;
+    }
+    return foldersCache;
+  } catch (error) {
+    console.error('[Folders] Failed to refresh cache:', error);
+    return foldersCache;
+  }
+};
 
 // Helper functions
 export const getFolderById = (id: string): Folder | undefined => {
-  return mockFolders.find(folder => folder.id === id);
+  return foldersCache.find(folder => folder.id === id);
+};
+
+export const getFolderByIdAsync = async (id: string): Promise<Folder | undefined> => {
+  try {
+    const response = await fetch(`${API_URL}/folders/${id}`, {
+      headers: getAuthHeaders()
+    });
+    if (response.ok) {
+      return await response.json();
+    }
+  } catch (error) {
+    console.error('[Folders] Failed to get folder:', error);
+  }
+  return getFolderById(id);
 };
 
 export const getRootFolders = (): Folder[] => {
-  return mockFolders.filter(folder => !folder.parentFolderId);
+  if (!cacheInitialized) {
+    initCache();
+  }
+  return foldersCache.filter(folder => !folder.parentFolderId);
+};
+
+export const getRootFoldersAsync = async (): Promise<Folder[]> => {
+  try {
+    const response = await fetch(`${API_URL}/folders`, {
+      headers: getAuthHeaders()
+    });
+    if (response.ok) {
+      const folders = await response.json();
+      foldersCache = folders;
+      cacheInitialized = true;
+      return folders;
+    }
+  } catch (error) {
+    console.error('[Folders] Failed to get root folders:', error);
+  }
+  return getRootFolders();
 };
 
 export const getSubFolders = (parentId: string): Folder[] => {
-  return mockFolders.filter(folder => folder.parentFolderId === parentId);
+  return foldersCache.filter(folder => folder.parentFolderId === parentId);
+};
+
+export const getSubFoldersAsync = async (parentId: string): Promise<Folder[]> => {
+  try {
+    const response = await fetch(`${API_URL}/folders/${parentId}/subfolders`, {
+      headers: getAuthHeaders()
+    });
+    if (response.ok) {
+      return await response.json();
+    }
+  } catch (error) {
+    console.error('[Folders] Failed to get subfolders:', error);
+  }
+  return getSubFolders(parentId);
 };
 
 export const getAllFolders = (): Folder[] => {
-  return mockFolders;
+  if (!cacheInitialized) {
+    initCache();
+  }
+  return foldersCache;
+};
+
+export const getAllFoldersAsync = async (): Promise<Folder[]> => {
+  return refreshFoldersCache();
 };
 
 export const addFolder = (folder: Folder): void => {
-  mockFolders.push(folder);
+  // Optimistic update
+  foldersCache.push(folder);
+
+  // Call API
+  fetch(`${API_URL}/folders`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({
+      name: folder.name,
+      description: folder.description,
+      color: folder.color,
+      parentFolderId: folder.parentFolderId
+    })
+  }).then(response => {
+    if (response.ok) {
+      return response.json();
+    }
+    throw new Error('Failed to create folder');
+  }).then(created => {
+    // Update cache with server-generated ID
+    const index = foldersCache.findIndex(f => f.id === folder.id);
+    if (index > -1) {
+      foldersCache[index] = created;
+    }
+  }).catch(error => {
+    console.error('[Folders] Failed to create folder:', error);
+    // Rollback
+    const index = foldersCache.findIndex(f => f.id === folder.id);
+    if (index > -1) {
+      foldersCache.splice(index, 1);
+    }
+  });
+};
+
+export const addFolderAsync = async (folder: Partial<Folder>): Promise<Folder> => {
+  const response = await fetch(`${API_URL}/folders`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({
+      name: folder.name,
+      description: folder.description,
+      color: folder.color,
+      parentFolderId: folder.parentFolderId
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to create folder');
+  }
+
+  const created = await response.json();
+  foldersCache.push(created);
+  return created;
+};
+
+export const updateFolder = (id: string, updates: Partial<Folder>): Folder | undefined => {
+  const index = foldersCache.findIndex(folder => folder.id === id);
+  if (index > -1) {
+    foldersCache[index] = { ...foldersCache[index], ...updates };
+
+    // Call API
+    fetch(`${API_URL}/folders/${id}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(updates)
+    }).catch(error => {
+      console.error('[Folders] Failed to update folder:', error);
+    });
+
+    return foldersCache[index];
+  }
+  return undefined;
 };
 
 export const deleteFolderById = (id: string): Folder[] => {
-  const index = mockFolders.findIndex(folder => folder.id === id);
-  if (index > -1) {
-    mockFolders.splice(index, 1);
-  }
-  return mockFolders;
+  // Optimistic update
+  const index = foldersCache.findIndex(folder => folder.id === id);
+  const deleted = index > -1 ? foldersCache.splice(index, 1)[0] : null;
+
+  // Call API
+  fetch(`${API_URL}/folders/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders()
+  }).catch(error => {
+    console.error('[Folders] Failed to delete folder:', error);
+    // Rollback
+    if (deleted) {
+      foldersCache.push(deleted);
+    }
+  });
+
+  return foldersCache;
 };
+
+export const deleteFolderByIdAsync = async (id: string): Promise<void> => {
+  const response = await fetch(`${API_URL}/folders/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders()
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to delete folder');
+  }
+
+  const index = foldersCache.findIndex(folder => folder.id === id);
+  if (index > -1) {
+    foldersCache.splice(index, 1);
+  }
+};
+
+// Initialize cache on module load
+initCache();

@@ -5,7 +5,6 @@ import {
   Search,
   Grid3x3,
   List,
-  FileText,
   FileIcon,
   HardDrive,
   Users,
@@ -59,8 +58,6 @@ export const FoldersPage: React.FC = () => {
   const allFiles = getAllFiles();
   const totalFolders = folders.length; // Total number of folders (including subfolders)
   const totalFiles = allFiles.length; // Exact number of files
-  const totalSize = calculateTotalStorage(); // Calculate real total size from all files
-
   // Calculate storage by category using the utility function
   const storageByCategory = calculateStorageByCategory(allFiles);
   const totalStorage = calculateTotalStorage();

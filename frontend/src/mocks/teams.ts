@@ -1,378 +1,235 @@
+/**
+ * Teams Data Service
+ * Uses real backend API for team operations
+ */
 import type { Team, TeamMember } from "../types/teams";
 
-export const mockTeams: Team[] = [
-  {
-    id: "team-1",
-    name: "Engineering Team",
-    description: "Core development team for product engineering",
-    createdBy: "current-user-id",
-    createdAt: new Date("2024-01-10").toISOString(),
-    sharedFiles: 24,
-    members: [
-      {
-        id: "current-user-id",
-        email: "admin@example.com",
-        name: "Admin User",
-        role: "admin",
-        joinedAt: new Date("2024-01-10").toISOString(),
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Admin",
-      },
-    ],
-    settings: {
-      allowMemberInvites: true,
-      allowFileSharing: true,
-      requireApproval: false,
-      maxMembers: 50,
-    },
-    memberCount: 0,
-  },
-  {
-    id: "team-2",
-    name: "Design Team",
-    description: "UI/UX and graphic design team",
-    createdBy: "user-2",
-    createdAt: new Date("2024-01-15").toISOString(),
-    sharedFiles: 18,
-    members: [
-      {
-        id: "user-2",
-        email: "george@example.com",
-        name: "George Harris",
-        role: "admin",
-        joinedAt: new Date("2024-01-15").toISOString(),
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=George",
-      },
-      {
-        id: "current-user-id",
-        email: "admin@example.com",
-        name: "Admin User",
-        role: "member",
-        joinedAt: new Date("2024-01-18").toISOString(),
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Admin",
-      },
-    ],
-    settings: {
-      allowMemberInvites: true,
-      allowFileSharing: true,
-      requireApproval: false,
-      maxMembers: 30,
-    },
-    memberCount: 0,
-  },
-  {
-    id: "team-3",
-    name: "Marketing",
-    description: "Marketing and communications team",
-    createdBy: "user-3",
-    createdAt: new Date("2024-02-01").toISOString(),
-    sharedFiles: 15,
-    members: [
-      {
-        id: "user-3",
-        email: "laura@example.com",
-        name: "Laura Quinn",
-        role: "admin",
-        joinedAt: new Date("2024-02-01").toISOString(),
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Laura",
-      },
-      {
-        id: "current-user-id",
-        email: "admin@example.com",
-        name: "Admin User",
-        role: "viewer",
-        joinedAt: new Date("2024-02-05").toISOString(),
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Admin",
-      },
-    ],
-    settings: {
-      allowMemberInvites: false,
-      allowFileSharing: true,
-      requireApproval: true,
-      maxMembers: 25,
-    },
-    memberCount: 0,
-  },
-  {
-    id: "team-4",
-    name: "Sales",
-    description: "Sales and business development",
-    createdBy: "current-user-id",
-    createdAt: new Date("2024-02-10").toISOString(),
-    sharedFiles: 12,
-    members: [
-      {
-        id: "current-user-id",
-        email: "admin@example.com",
-        name: "Admin User",
-        role: "admin",
-        joinedAt: new Date("2024-02-10").toISOString(),
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Admin",
-      },
-    ],
-    settings: {
-      allowMemberInvites: true,
-      allowFileSharing: true,
-      requireApproval: false,
-      maxMembers: 20,
-    },
-    memberCount: 0,
-  },
-];
+// Local cache for reactive UI updates
+let teamsCache: Team[] = [];
+let cacheInitialized = false;
 
-export const mockTeamMembers: Record<string, TeamMember[]> = {
-  "team-1": [
-    {
-      id: "member-1-0",
-      name: "Admin User",
-      email: "admin@example.com",
-      role: "admin",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Admin",
-      joinedAt: new Date("2024-01-10").toISOString(),
-    },
-    {
-      id: "member-1-1",
-      name: "John Doe",
-      email: "john@example.com",
-      role: "admin",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=John",
-      joinedAt: new Date("2024-01-10").toISOString(),
-    },
-    {
-      id: "member-1-2",
-      name: "Jane Smith",
-      email: "jane@example.com",
-      role: "member",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Jane",
-      joinedAt: new Date("2024-01-12").toISOString(),
-    },
-    {
-      id: "member-1-3",
-      name: "Bob Wilson",
-      email: "bob@example.com",
-      role: "member",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Bob",
-      joinedAt: new Date("2024-01-15").toISOString(),
-    },
-    {
-      id: "member-1-4",
-      name: "Alice Brown",
-      email: "alice@example.com",
-      role: "viewer",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Alice",
-      joinedAt: new Date("2024-01-20").toISOString(),
-    },
-    {
-      id: "member-1-5",
-      name: "Charlie Davis",
-      email: "charlie@example.com",
-      role: "member",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Charlie",
-      joinedAt: new Date("2024-02-01").toISOString(),
-    },
-    {
-      id: "member-1-6",
-      name: "Diana Evans",
-      email: "diana@example.com",
-      role: "member",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Diana",
-      joinedAt: new Date("2024-02-05").toISOString(),
-    },
-    {
-      id: "member-1-7",
-      name: "Ethan Foster",
-      email: "ethan@example.com",
-      role: "viewer",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Ethan",
-      joinedAt: new Date("2024-02-10").toISOString(),
-    },
-    {
-      id: "member-1-8",
-      name: "Fiona Green",
-      email: "fiona@example.com",
-      role: "member",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Fiona",
-      joinedAt: new Date("2024-02-15").toISOString(),
-    },
-  ],
-  "team-2": [
-    {
-      id: "member-2-1",
-      name: "George Harris",
-      email: "george@example.com",
-      role: "admin",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=George",
-      joinedAt: new Date("2024-01-15").toISOString(),
-    },
-    {
-      id: "member-2-2",
-      name: "Hannah Lee",
-      email: "hannah@example.com",
-      role: "member",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Hannah",
-      joinedAt: new Date("2024-01-18").toISOString(),
-    },
-    {
-      id: "member-2-3",
-      name: "Ian Moore",
-      email: "ian@example.com",
-      role: "member",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Ian",
-      joinedAt: new Date("2024-01-20").toISOString(),
-    },
-    {
-      id: "member-2-4",
-      name: "Julia Nelson",
-      email: "julia@example.com",
-      role: "member",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Julia",
-      joinedAt: new Date("2024-01-25").toISOString(),
-    },
-    {
-      id: "member-2-5",
-      name: "Kevin Park",
-      email: "kevin@example.com",
-      role: "viewer",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Kevin",
-      joinedAt: new Date("2024-02-01").toISOString(),
-    },
-  ],
-  "team-3": [
-    {
-      id: "member-3-1",
-      name: "Laura Quinn",
-      email: "laura@example.com",
-      role: "admin",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Laura",
-      joinedAt: new Date("2024-02-01").toISOString(),
-    },
-    {
-      id: "member-3-2",
-      name: "Mike Roberts",
-      email: "mike@example.com",
-      role: "member",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Mike",
-      joinedAt: new Date("2024-02-03").toISOString(),
-    },
-    {
-      id: "member-3-3",
-      name: "Nancy Scott",
-      email: "nancy@example.com",
-      role: "member",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Nancy",
-      joinedAt: new Date("2024-02-05").toISOString(),
-    },
-    {
-      id: "member-3-4",
-      name: "Oscar Taylor",
-      email: "oscar@example.com",
-      role: "member",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Oscar",
-      joinedAt: new Date("2024-02-08").toISOString(),
-    },
-    {
-      id: "member-3-5",
-      name: "Paula White",
-      email: "paula@example.com",
-      role: "viewer",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Paula",
-      joinedAt: new Date("2024-02-10").toISOString(),
-    },
-    {
-      id: "member-3-6",
-      name: "Quinn Adams",
-      email: "quinn@example.com",
-      role: "member",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Quinn",
-      joinedAt: new Date("2024-02-12").toISOString(),
-    },
-  ],
-  "team-4": [
-    {
-      id: "member-4-1",
-      name: "Rachel Baker",
-      email: "rachel@example.com",
-      role: "admin",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Rachel",
-      joinedAt: new Date("2024-02-10").toISOString(),
-    },
-    {
-      id: "member-4-2",
-      name: "Sam Carter",
-      email: "sam@example.com",
-      role: "member",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Sam",
-      joinedAt: new Date("2024-02-12").toISOString(),
-    },
-    {
-      id: "member-4-3",
-      name: "Tom Davis",
-      email: "tom@example.com",
-      role: "member",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Tom",
-      joinedAt: new Date("2024-02-15").toISOString(),
-    },
-    {
-      id: "member-4-4",
-      name: "Uma Foster",
-      email: "uma@example.com",
-      role: "viewer",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Uma",
-      joinedAt: new Date("2024-02-18").toISOString(),
-    },
-  ],
+// API base URL
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+
+// Get auth token
+const getAuthHeaders = () => {
+  const token = localStorage.getItem('authToken');
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+  };
+};
+
+// Initialize cache from API
+const initCache = async (): Promise<void> => {
+  if (!cacheInitialized) {
+    try {
+      const response = await fetch(`${API_URL}/teams`, {
+        headers: getAuthHeaders()
+      });
+      if (response.ok) {
+        teamsCache = await response.json();
+        cacheInitialized = true;
+      }
+    } catch (error) {
+      console.warn('[Teams] API not available, using empty cache');
+      teamsCache = [];
+    }
+  }
+};
+
+// Refresh cache from API
+export const refreshTeamsCache = async (): Promise<Team[]> => {
+  try {
+    const response = await fetch(`${API_URL}/teams`, {
+      headers: getAuthHeaders()
+    });
+    if (response.ok) {
+      teamsCache = await response.json();
+      cacheInitialized = true;
+    }
+    return teamsCache;
+  } catch (error) {
+    console.error('[Teams] Failed to refresh cache:', error);
+    return teamsCache;
+  }
 };
 
 // Helper functions
 export const getTeamById = (id: string): Team | undefined => {
-  return mockTeams.find((team) => team.id === id);
+  return teamsCache.find((team) => team.id === id);
+};
+
+export const getTeamByIdAsync = async (id: string): Promise<Team | undefined> => {
+  try {
+    const response = await fetch(`${API_URL}/teams/${id}`, {
+      headers: getAuthHeaders()
+    });
+    if (response.ok) {
+      return await response.json();
+    }
+  } catch (error) {
+    console.error('[Teams] Failed to get team:', error);
+  }
+  return getTeamById(id);
 };
 
 export const getAllTeams = (): Team[] => {
-  return mockTeams;
+  if (!cacheInitialized) {
+    initCache();
+  }
+  return teamsCache;
+};
+
+export const getAllTeamsAsync = async (): Promise<Team[]> => {
+  return refreshTeamsCache();
 };
 
 export const getTeamMembers = (teamId: string): TeamMember[] => {
-  return mockTeamMembers[teamId] || [];
+  const team = teamsCache.find(t => t.id === teamId);
+  return team?.members || [];
 };
 
 export const addTeam = (team: Team): void => {
-  mockTeams.push(team);
+  // Optimistic update
+  teamsCache.push(team);
+
+  // Call API
+  fetch(`${API_URL}/teams`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({
+      name: team.name,
+      description: team.description
+    })
+  }).then(response => {
+    if (response.ok) {
+      return response.json();
+    }
+    throw new Error('Failed to create team');
+  }).then(created => {
+    // Update cache with server-generated data
+    const index = teamsCache.findIndex(t => t.id === team.id);
+    if (index > -1) {
+      teamsCache[index] = created;
+    }
+  }).catch(error => {
+    console.error('[Teams] Failed to create team:', error);
+    // Rollback
+    const index = teamsCache.findIndex(t => t.id === team.id);
+    if (index > -1) {
+      teamsCache.splice(index, 1);
+    }
+  });
+};
+
+export const addTeamAsync = async (team: Partial<Team>): Promise<Team> => {
+  const response = await fetch(`${API_URL}/teams`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({
+      name: team.name,
+      description: team.description
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to create team');
+  }
+
+  const created = await response.json();
+  teamsCache.push(created);
+  return created;
 };
 
 export const deleteTeamById = (id: string): Team[] => {
-  const index = mockTeams.findIndex((team) => team.id === id);
-  if (index > -1) {
-    mockTeams.splice(index, 1);
-    delete mockTeamMembers[id];
+  // Optimistic update
+  const index = teamsCache.findIndex((team) => team.id === id);
+  const deleted = index > -1 ? teamsCache.splice(index, 1)[0] : null;
+
+  // Call API
+  fetch(`${API_URL}/teams/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders()
+  }).catch(error => {
+    console.error('[Teams] Failed to delete team:', error);
+    // Rollback
+    if (deleted) {
+      teamsCache.push(deleted);
+    }
+  });
+
+  return teamsCache;
+};
+
+export const deleteTeamByIdAsync = async (id: string): Promise<void> => {
+  const response = await fetch(`${API_URL}/teams/${id}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders()
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to delete team');
   }
-  return mockTeams;
+
+  const index = teamsCache.findIndex((team) => team.id === id);
+  if (index > -1) {
+    teamsCache.splice(index, 1);
+  }
 };
 
 export const addTeamMember = (teamId: string, member: TeamMember): void => {
-  if (!mockTeamMembers[teamId]) {
-    mockTeamMembers[teamId] = [];
-  }
-  mockTeamMembers[teamId].push(member);
-
-  // Update team member count
-  const team = getTeamById(teamId);
+  // Update local cache
+  const team = teamsCache.find(t => t.id === teamId);
   if (team) {
-    team.memberCount = mockTeamMembers[teamId].length;
+    if (!team.members) team.members = [];
+    team.members.push(member);
+    team.memberCount = team.members.length;
   }
+
+  // Call API
+  fetch(`${API_URL}/teams/${teamId}/members`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({
+      email: member.email,
+      role: member.role
+    })
+  }).catch(error => {
+    console.error('[Teams] Failed to add member:', error);
+    // Rollback
+    if (team && team.members) {
+      const idx = team.members.findIndex(m => m.id === member.id);
+      if (idx > -1) team.members.splice(idx, 1);
+      team.memberCount = team.members.length;
+    }
+  });
 };
 
 export const removeTeamMember = (teamId: string, memberId: string): void => {
-  if (mockTeamMembers[teamId]) {
-    mockTeamMembers[teamId] = mockTeamMembers[teamId].filter(
-      (m) => m.id !== memberId
-    );
-
-    // Update team member count
-    const team = getTeamById(teamId);
-    if (team) {
-      team.memberCount = mockTeamMembers[teamId].length;
+  // Update local cache
+  const team = teamsCache.find(t => t.id === teamId);
+  let removed: TeamMember | undefined;
+  if (team && team.members) {
+    const idx = team.members.findIndex(m => m.id === memberId);
+    if (idx > -1) {
+      removed = team.members.splice(idx, 1)[0];
+      team.memberCount = team.members.length;
     }
   }
+
+  // Call API
+  fetch(`${API_URL}/teams/${teamId}/members/${memberId}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders()
+  }).catch(error => {
+    console.error('[Teams] Failed to remove member:', error);
+    // Rollback
+    if (team && removed) {
+      team.members?.push(removed);
+      team.memberCount = team.members?.length || 0;
+    }
+  });
 };
 
 export const updateTeamMemberRole = (
@@ -380,38 +237,76 @@ export const updateTeamMemberRole = (
   memberId: string,
   newRole: "admin" | "member" | "viewer"
 ): void => {
-  if (mockTeamMembers[teamId]) {
-    const member = mockTeamMembers[teamId].find((m) => m.id === memberId);
+  const team = teamsCache.find(t => t.id === teamId);
+  if (team && team.members) {
+    const member = team.members.find((m) => m.id === memberId);
     if (member) {
       member.role = newRole;
     }
   }
+  // TODO: Add API endpoint for role update
 };
 
 export const updateTeam = (
   teamId: string,
-  updatedTeam: Team
+  updatedTeam: Partial<Team>
 ): Team | undefined => {
-  const index = mockTeams.findIndex((team) => team.id === teamId);
+  const index = teamsCache.findIndex((team) => team.id === teamId);
   if (index > -1) {
-    mockTeams[index] = { ...mockTeams[index], ...updatedTeam };
-    return mockTeams[index];
+    teamsCache[index] = { ...teamsCache[index], ...updatedTeam };
+
+    // Call API
+    fetch(`${API_URL}/teams/${teamId}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        name: updatedTeam.name,
+        description: updatedTeam.description
+      })
+    }).catch(error => {
+      console.error('[Teams] Failed to update team:', error);
+    });
+
+    return teamsCache[index];
   }
   return undefined;
 };
 
-// Helper to get user info by email from all teams
+// Get user info by email
 export const getUserByEmail = (email: string): { name: string; email: string; avatar?: string } | undefined => {
   // Search in all team members
-  for (const teamId in mockTeamMembers) {
-    const member = mockTeamMembers[teamId].find((m) => m.email === email);
-    if (member) {
-      return {
-        name: member.name,
-        email: member.email,
-        avatar: member.avatar,
-      };
+  for (const team of teamsCache) {
+    if (team.members) {
+      const member = team.members.find((m) => m.email === email);
+      if (member) {
+        return {
+          name: member.name,
+          email: member.email,
+          avatar: member.avatar,
+        };
+      }
     }
   }
+
+  // Check current user
+  try {
+    const userStr = localStorage.getItem('currentUser');
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      if (user.email === email) {
+        return {
+          name: user.name,
+          email: user.email,
+          avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.name}`
+        };
+      }
+    }
+  } catch {
+    // Ignore
+  }
+
   return undefined;
 };
+
+// Initialize cache on module load
+initCache();

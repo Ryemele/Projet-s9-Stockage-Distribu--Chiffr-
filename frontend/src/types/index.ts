@@ -33,6 +33,14 @@ export interface EncryptedFile {
   uploadedBy?: string; // User email who uploaded
   teamId?: string; // Team with which this file is shared
   sharedWith?: string[]; // List of user IDs with whom this file is shared
+  // Distributed storage fields
+  isChunked?: boolean; // Whether file uses chunked/distributed storage
+  checksum?: string; // SHA-256 checksum of original file
+  erasureCoding?: {
+    data_shards: number;
+    parity_shards: number;
+    fault_tolerance: number;
+  };
 }
 
 export interface DecryptedFileMetadata {

@@ -10,8 +10,6 @@ import {
   Image,
   Video,
   Archive,
-  Music,
-  Code,
 } from "lucide-react";
 import { categorizeFile } from "../../utils/fileCategories";
 
