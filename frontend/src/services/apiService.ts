@@ -137,8 +137,10 @@ class ApiService {
       encryptedDataUrl: '',
       iv: backendFile.iv || '',
       salt: backendFile.salt || '',
-      isChunked: backendFile.is_chunked || false,
+      isChunked: backendFile.is_chunked || backendFile.isChunked || false,
       checksum: backendFile.checksum || '',
+      starred: backendFile.starred || false,
+      folderId: backendFile.folder_id || backendFile.folderId || null,
     };
   }
 
@@ -458,6 +460,96 @@ class ApiService {
 
   async updatePublicKey(publicKey: string | { publicKey1: string; publicKey2: string }): Promise<void> {
     await this.api.put("/auth/public-key", { public_key: publicKey });
+  }
+
+  // ==================== File Operations ====================
+
+  async toggleFileStarred(fileId: string): Promise<{ starred: boolean }> {
+    const response = await this.api.patch(`/files/${fileId}/starred`);
+    return response.data;
+  }
+
+  async moveFileToFolder(fileId: string, folderId: string | null): Promise<void> {
+    await this.api.patch(`/files/${fileId}/folder`, { folder_id: folderId });
+  }
+
+  // ==================== Storage Stats ====================
+
+  async getStorageStats(): Promise<{ used: number; total: number; fileCount: number }> {
+    const response = await this.api.get("/storage/stats");
+    return {
+      used: response.data.used_bytes || response.data.used || 0,
+      total: response.data.total_bytes || response.data.total || 10 * 1024 * 1024 * 1024, // 10GB default
+      fileCount: response.data.file_count || response.data.fileCount || 0,
+    };
+  }
+
+  // ==================== Folders ====================
+
+  async getFolders(): Promise<any[]> {
+    const response = await this.api.get("/folders");
+    return Array.isArray(response.data) ? response.data : (response.data.folders || []);
+  }
+
+  async createFolder(name: string, parentId?: string): Promise<any> {
+    const response = await this.api.post("/folders", { name, parent_id: parentId });
+    return response.data.folder || response.data;
+  }
+
+  async deleteFolder(folderId: string): Promise<void> {
+    await this.api.delete(`/folders/${folderId}`);
+  }
+
+  async getFolderFiles(folderId: string): Promise<EncryptedFile[]> {
+    const response = await this.api.get(`/folders/${folderId}/files`);
+    const files = Array.isArray(response.data) ? response.data : (response.data.files || []);
+    return files.map((f: any) => this.adaptFile(f));
+  }
+
+  // ==================== Teams ====================
+
+  async getTeams(): Promise<any[]> {
+    const response = await this.api.get("/teams");
+    return Array.isArray(response.data) ? response.data : (response.data.teams || []);
+  }
+
+  async createTeam(name: string, description?: string): Promise<any> {
+    const response = await this.api.post("/teams", { name, description });
+    return response.data.team || response.data;
+  }
+
+  async getTeam(teamId: string): Promise<any> {
+    const response = await this.api.get(`/teams/${teamId}`);
+    return response.data.team || response.data;
+  }
+
+  async updateTeam(teamId: string, data: { name?: string; description?: string }): Promise<any> {
+    const response = await this.api.put(`/teams/${teamId}`, data);
+    return response.data.team || response.data;
+  }
+
+  async deleteTeam(teamId: string): Promise<void> {
+    await this.api.delete(`/teams/${teamId}`);
+  }
+
+  async getTeamMembers(teamId: string): Promise<any[]> {
+    const response = await this.api.get(`/teams/${teamId}/members`);
+    return Array.isArray(response.data) ? response.data : (response.data.members || []);
+  }
+
+  async addTeamMember(teamId: string, email: string, role: string = 'member'): Promise<any> {
+    const response = await this.api.post(`/teams/${teamId}/members`, { email, role });
+    return response.data;
+  }
+
+  async removeTeamMember(teamId: string, memberId: string): Promise<void> {
+    await this.api.delete(`/teams/${teamId}/members/${memberId}`);
+  }
+
+  async getTeamFiles(teamId: string): Promise<EncryptedFile[]> {
+    const response = await this.api.get(`/teams/${teamId}/files`);
+    const files = Array.isArray(response.data) ? response.data : (response.data.files || []);
+    return files.map((f: any) => this.adaptFile(f));
   }
 
   // ==================== Health Check ====================

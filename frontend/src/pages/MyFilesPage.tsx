@@ -126,8 +126,16 @@ export const MyFilesPage: React.FC = () => {
 
   // Handle star toggle
   const handleToggleStar = async (file: { id: string }) => {
-    // TODO: Implement star toggle API
-    console.log('Toggle star for:', file.id);
+    try {
+      const result = await apiService.toggleFileStarred(file.id);
+      // Update local state
+      setFiles(files.map(f =>
+        f.id === file.id ? { ...f, starred: result.starred } : f
+      ));
+    } catch (err) {
+      console.error('[MyFilesPage] Error toggling star:', err);
+      alert('Failed to update star status');
+    }
   };
 
   // Handle share - load envelope and show dialog

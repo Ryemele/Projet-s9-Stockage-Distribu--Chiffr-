@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Plus,
   Folder as FolderIcon,
@@ -8,36 +8,86 @@ import {
   FileIcon,
   HardDrive,
   Users,
+  Loader2,
 } from "lucide-react";
 import type { Folder } from "../types/folder";
 import { FolderCard } from "../components/folders/FolderCard";
 import { CreateFolderModal } from "../components/folders/CreateFolderModal";
-import {
-  getAllFolders,
-  addFolder,
-  deleteFolderById,
-  getAllFiles,
-  calculateTotalStorage,
-  formatSize,
-} from "../mocks";
-import { getUserByEmail } from "../mocks/teams";
+import { apiService } from "../services/apiService";
 import { calculateStorageByCategory } from "../utils/fileCategories";
+import type { EncryptedFile } from "../types";
+
+// Helper function to format file size
+const formatSize = (bytes: number): string => {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+};
 
 export const FoldersPage: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [folders, setFolders] = useState<Folder[]>([]);
+  const [files, setFiles] = useState<EncryptedFile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [storageStats, setStorageStats] = useState({ used: 0, total: 10 * 1024 * 1024 * 1024 });
 
-  const [folders, setFolders] = useState<Folder[]>(getAllFolders());
+  // Load folders and files on mount
+  useEffect(() => {
+    loadData();
+  }, []);
 
-  const handleCreateFolder = (folder: Folder) => {
-    addFolder(folder);
-    setFolders(getAllFolders());
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [foldersData, filesData, statsData] = await Promise.all([
+        apiService.getFolders(),
+        apiService.getFiles(),
+        apiService.getStorageStats(),
+      ]);
+
+      // Adapt folders to match Folder type
+      const adaptedFolders: Folder[] = foldersData.map((f: any) => ({
+        id: f.id || f.folder_id,
+        name: f.name,
+        description: f.description,
+        color: f.color || 'blue',
+        parentFolderId: f.parentFolderId || f.parent_folder_id,
+        createdAt: f.createdAt || f.created_at,
+        updatedAt: f.updatedAt || f.updated_at,
+        fileCount: f.fileCount || 0,
+        size: f.size || 0,
+      }));
+
+      setFolders(adaptedFolders);
+      setFiles(filesData);
+      setStorageStats({ used: statsData.used, total: statsData.total });
+    } catch (err) {
+      console.error('[FoldersPage] Error loading data:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleDeleteFolder = (folderId: string) => {
-    deleteFolderById(folderId);
-    setFolders(getAllFolders());
+  const handleCreateFolder = async (folder: Folder) => {
+    try {
+      await apiService.createFolder(folder.name, folder.parentFolderId || undefined);
+      await loadData();
+    } catch (err) {
+      console.error('[FoldersPage] Error creating folder:', err);
+    }
+  };
+
+  const handleDeleteFolder = async (folderId: string) => {
+    try {
+      await apiService.deleteFolder(folderId);
+      setFolders(folders.filter(f => f.id !== folderId));
+    } catch (err) {
+      console.error('[FoldersPage] Error deleting folder:', err);
+    }
   };
 
   const handleEditFolder = (folder: Folder) => {
@@ -54,13 +104,12 @@ export const FoldersPage: React.FC = () => {
       folder.description?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Get exact counts
-  const allFiles = getAllFiles();
-  const totalFolders = folders.length; // Total number of folders (including subfolders)
-  const totalFiles = allFiles.length; // Exact number of files
+  // Get counts from state
+  const totalFolders = folders.length;
+  const totalFiles = files.length;
   // Calculate storage by category using the utility function
-  const storageByCategory = calculateStorageByCategory(allFiles);
-  const totalStorage = calculateTotalStorage();
+  const storageByCategory = calculateStorageByCategory(files);
+  const totalStorage = storageStats.used;
 
   // Calculate percentages and create segments for the circle
   const segments = Object.entries(storageByCategory)
@@ -71,13 +120,13 @@ export const FoldersPage: React.FC = () => {
       percentage: (data.size / totalStorage) * 100,
     }));
 
-  // Get all unique participants from files
-  const getParticipants = () => {
-    const uniqueEmails = new Set(allFiles.map(f => f.uploadedBy).filter(Boolean));
-    return Array.from(uniqueEmails).slice(0, 8);
-  };
-
-  const participants = getParticipants();
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 text-primary-500 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -124,51 +173,23 @@ export const FoldersPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Participants Card */}
+        {/* Quick Stats Card */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-gray-900">Participants</h3>
+            <h3 className="text-sm font-semibold text-gray-900">Quick Stats</h3>
             <div className="flex items-center gap-1 text-xs text-gray-500">
               <Users className="h-4 w-4" />
-              <span>{participants.length}</span>
             </div>
           </div>
-          <div className="space-y-3">
-            {participants.slice(0, 3).map((email, index) => {
-              const user = getUserByEmail(email);
-              return (
-                <div key={index} className="flex items-center gap-3">
-                  <div
-                    className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-500 to-secondary-400 flex items-center justify-center overflow-hidden shadow-sm flex-shrink-0"
-                  >
-                    {user?.avatar ? (
-                      <img
-                        src={user.avatar}
-                        alt={user.name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <span className="text-white text-sm font-semibold">
-                        {(user?.name || email).charAt(0).toUpperCase()}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">
-                      {user?.name || 'Unknown'}
-                    </p>
-                    <p className="text-xs text-gray-500 truncate">
-                      {email}
-                    </p>
-                  </div>
-                </div>
-              );
-            })}
-            {participants.length > 3 && (
-              <div className="text-xs text-gray-500 text-center pt-2 border-t border-gray-100">
-                +{participants.length - 3} more participants
-              </div>
-            )}
+          <div className="space-y-4">
+            <div className="text-center p-4 bg-gray-50 rounded-lg">
+              <p className="text-2xl font-bold text-primary-600">{totalFolders}</p>
+              <p className="text-sm text-gray-600">Total Folders</p>
+            </div>
+            <div className="text-center p-4 bg-gray-50 rounded-lg">
+              <p className="text-2xl font-bold text-secondary-500">{totalFiles}</p>
+              <p className="text-sm text-gray-600">Total Files</p>
+            </div>
           </div>
         </div>
 

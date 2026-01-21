@@ -1016,6 +1016,43 @@ def delete_team(
     return {"message": "Team deleted"}
 
 
+@app.get("/api/teams/{team_id}/members")
+def get_team_members(
+    team_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get members of a team"""
+    team = db.query(Team).filter(Team.team_id == team_id).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+
+    # Check if user is member of team
+    membership = db.query(TeamMember).filter(
+        TeamMember.team_id == team_id,
+        TeamMember.user_id == user.user_id
+    ).first()
+
+    if not membership and str(team.created_by) != str(user.user_id):
+        raise HTTPException(status_code=403, detail="Not a member of this team")
+
+    members = db.query(TeamMember).filter(TeamMember.team_id == team_id).all()
+    result = []
+    for m in members:
+        member_user = db.query(User).filter(User.user_id == m.user_id).first()
+        if member_user:
+            result.append({
+                "id": str(m.user_id),
+                "memberId": str(m.member_id),
+                "email": member_user.email,
+                "name": member_user.name,
+                "role": m.role,
+                "joinedAt": m.joined_at.isoformat() if m.joined_at else None,
+                "avatar": f"https://api.dicebear.com/7.x/avataaars/svg?seed={member_user.name}"
+            })
+    return result
+
+
 @app.post("/api/teams/{team_id}/members")
 def add_team_member(
     team_id: str,
@@ -1146,6 +1183,39 @@ def toggle_file_starred(
     f.starred = 0 if f.starred else 1
     db.commit()
     return {"starred": bool(f.starred)}
+
+
+@app.patch("/api/files/{file_id}/folder")
+def move_file_to_folder(
+    file_id: str,
+    data: dict,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Move a file to a folder (or remove from folder if folder_id is null)"""
+    f = db.query(FileModel).filter(
+        FileModel.file_id == file_id,
+        FileModel.owner_id == user.user_id
+    ).first()
+    if not f:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    folder_id = data.get("folder_id")
+
+    # If folder_id is provided, verify folder exists and belongs to user
+    if folder_id:
+        folder = db.query(Folder).filter(
+            Folder.folder_id == folder_id,
+            Folder.owner_id == user.user_id
+        ).first()
+        if not folder:
+            raise HTTPException(status_code=404, detail="Folder not found")
+        f.folder_id = folder_id
+    else:
+        f.folder_id = None
+
+    db.commit()
+    return {"folder_id": str(f.folder_id) if f.folder_id else None}
 
 
 # ==================== STORAGE STATS ENDPOINT ====================

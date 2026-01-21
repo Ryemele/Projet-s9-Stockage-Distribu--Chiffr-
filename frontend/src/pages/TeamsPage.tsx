@@ -1,53 +1,111 @@
-import React, { useState } from "react";
-import { Plus, Users, Shield, Search } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Plus, Users, Shield, Search, Loader2 } from "lucide-react";
 import type { Team } from "../types/teams";
 import { TeamCard } from "../components/teams/TeamCard";
 import { TeamManagementModal } from "../components/teams/TeamManagementModal";
 import { CreateTeamModal } from "../components/teams/CreateTeamModal";
 import { EditTeamModal } from "../components/teams/EditTeamModal";
-import {
-  getAllTeams,
-  addTeam,
-  deleteTeamById,
-  updateTeam,
-  getTeamFileCount,
-} from "../mocks";
+import { apiService } from "../services/apiService";
 import { useToast } from "../contexts/ToastContext";
+import { useAuth } from "../contexts/AuthContext";
 
 export const TeamsPage: React.FC = () => {
-  const [teams, setTeams] = useState<Team[]>(getAllTeams());
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [editTeam, setEditTeam] = useState<Team | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const { showSuccess, showError } = useToast();
+  const { user } = useAuth();
 
-  const handleCreateTeam = (team: Team) => {
-    addTeam(team);
-    setTeams(getAllTeams());
-    showSuccess("Team created", `${team.name} has been created successfully`);
-    setShowCreateModal(false);
-  };
+  // Load teams from API
+  useEffect(() => {
+    loadTeams();
+  }, []);
 
-  const handleDeleteTeam = (teamId: string) => {
-    const team = teams.find((t) => t.id === teamId);
-    if (confirm("Are you sure you want to delete this team?")) {
-      deleteTeamById(teamId);
-      setTeams(getAllTeams());
-      showSuccess("Team deleted", `${team?.name || "Team"} has been deleted`);
+  const loadTeams = async () => {
+    try {
+      setLoading(true);
+      const teamsData = await apiService.getTeams();
+
+      // Adapt backend data to Team type with members
+      const adaptedTeams: Team[] = await Promise.all(teamsData.map(async (t: any) => {
+        let members: any[] = [];
+        try {
+          const membersData = await apiService.getTeamMembers(t.id);
+          members = membersData.map((m: any) => ({
+            id: m.userId || m.user_id || m.id,
+            name: m.name || m.userName || 'Unknown',
+            email: m.email || '',
+            role: m.role || 'member',
+            avatar: m.avatar,
+          }));
+        } catch {
+          // Ignore if members endpoint fails
+        }
+
+        return {
+          id: t.id || t.team_id,
+          name: t.name,
+          description: t.description || '',
+          createdBy: t.createdBy || t.created_by,
+          createdAt: t.createdAt || t.created_at,
+          members: members,
+          memberCount: members.length,
+          settings: t.settings || {},
+          sharedFiles: t.sharedFiles || 0,
+        };
+      }));
+
+      setTeams(adaptedTeams);
+    } catch (err) {
+      console.error('[TeamsPage] Error loading teams:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleUpdateTeam = (updatedTeam: Team) => {
-    const result = updateTeam(updatedTeam.id, updatedTeam);
-    if (result) {
-      setTeams(getAllTeams());
+  const handleCreateTeam = async (team: Team) => {
+    try {
+      await apiService.createTeam(team.name, team.description);
+      await loadTeams();
+      showSuccess("Team created", `${team.name} has been created successfully`);
+      setShowCreateModal(false);
+    } catch (err) {
+      console.error('[TeamsPage] Error creating team:', err);
+      showError("Creation failed", "Failed to create team");
+    }
+  };
+
+  const handleDeleteTeam = async (teamId: string) => {
+    const team = teams.find((t) => t.id === teamId);
+    if (confirm("Are you sure you want to delete this team?")) {
+      try {
+        await apiService.deleteTeam(teamId);
+        setTeams(teams.filter(t => t.id !== teamId));
+        showSuccess("Team deleted", `${team?.name || "Team"} has been deleted`);
+      } catch (err) {
+        console.error('[TeamsPage] Error deleting team:', err);
+        showError("Delete failed", "Failed to delete team");
+      }
+    }
+  };
+
+  const handleUpdateTeam = async (updatedTeam: Team) => {
+    try {
+      await apiService.updateTeam(updatedTeam.id, {
+        name: updatedTeam.name,
+        description: updatedTeam.description,
+      });
+      await loadTeams();
       showSuccess(
         "Team updated",
         `${updatedTeam.name} has been updated successfully`
       );
       setEditTeam(null);
-    } else {
+    } catch (err) {
+      console.error('[TeamsPage] Error updating team:', err);
       showError("Update failed", "Failed to update team");
     }
   };
@@ -60,13 +118,22 @@ export const TeamsPage: React.FC = () => {
   const filteredTeams = teams.filter(
     (team) =>
       team.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      team.description.toLowerCase().includes(searchQuery.toLowerCase())
+      (team.description || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const userTeams = filteredTeams;
+  const currentUserId = user?.id;
   const adminTeams = filteredTeams.filter(
-    (t) => t.members.find((m) => m.id === "current-user-id")?.role === "admin"
+    (t) => t.members.find((m) => m.id === currentUserId)?.role === "admin"
   );
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 text-primary-500 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -205,11 +272,6 @@ export const TeamsPage: React.FC = () => {
           </h3>
           <div className="space-y-3">
             {teams
-              .map((team) => ({
-                ...team,
-                actualFileCount: getTeamFileCount(team.id),
-              }))
-              .sort((a, b) => b.actualFileCount - a.actualFileCount)
               .slice(0, 3)
               .map((team) => (
                 <div
@@ -225,7 +287,7 @@ export const TeamsPage: React.FC = () => {
                     </span>
                   </div>
                   <span className="text-xs font-medium text-gray-500 ml-2">
-                    {team.actualFileCount} files
+                    {team.members.length} members
                   </span>
                 </div>
               ))}
@@ -272,8 +334,8 @@ export const TeamsPage: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {userTeams.map((team) => {
             const isAdmin =
-              team.members.find((m) => m.id === "current-user-id")?.role ===
-              "admin";
+              team.members.find((m) => m.id === currentUserId)?.role === "admin" ||
+              team.createdBy === currentUserId;
             return (
               <div key={team.id} onClick={() => setSelectedTeam(team)}>
                 <TeamCard
@@ -302,8 +364,9 @@ export const TeamsPage: React.FC = () => {
         <TeamManagementModal
           team={selectedTeam}
           isAdmin={
-            selectedTeam.members.find((m) => m.id === "current-user-id")
-              ?.role === "admin" || false
+            selectedTeam.members.find((m) => m.id === currentUserId)?.role === "admin" ||
+            selectedTeam.createdBy === currentUserId ||
+            false
           }
           onClose={() => setSelectedTeam(null)}
           onUpdate={handleUpdateTeam}

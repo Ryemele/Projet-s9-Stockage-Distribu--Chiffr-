@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import {
@@ -12,7 +12,7 @@ import {
   Folder,
   HardDrive,
 } from "lucide-react";
-import { calculateTotalStorage, formatSize } from "../../mocks";
+import { apiService } from "../../services/apiService";
 
 interface NavItem {
   name: string;
@@ -21,15 +21,40 @@ interface NavItem {
   badge?: number;
 }
 
+// Helper function to format file size
+const formatSize = (bytes: number): string => {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+};
+
 export const Sidebar: React.FC = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Calculate storage usage
-  const usedStorage = calculateTotalStorage();
-  const totalStorage = 10 * 1024 * 1024 * 1024; // 10 GB limit
-  const storagePercentage = (usedStorage / totalStorage) * 100;
+  // Storage state
+  const [usedStorage, setUsedStorage] = useState(0);
+  const [totalStorage, setTotalStorage] = useState(10 * 1024 * 1024 * 1024); // 10 GB default
+
+  // Fetch storage stats on mount and when location changes
+  useEffect(() => {
+    const fetchStorageStats = async () => {
+      try {
+        const stats = await apiService.getStorageStats();
+        setUsedStorage(stats.used);
+        setTotalStorage(stats.total);
+      } catch (err) {
+        console.error('[Sidebar] Failed to fetch storage stats:', err);
+      }
+    };
+
+    fetchStorageStats();
+  }, [location.pathname]); // Refresh when navigating
+
+  const storagePercentage = totalStorage > 0 ? (usedStorage / totalStorage) * 100 : 0;
 
   const handleLogout = async () => {
     await logout();
