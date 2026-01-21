@@ -55,6 +55,28 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const token = localStorage.getItem("authToken");
         if (token) {
           const user = await apiService.getCurrentUser();
+
+          // Load AFGH key pair from localStorage
+          const storedKeyPair = localStorage.getItem(`afgh_keypair_${user.email}`);
+          let afghKeyPair: AFGHKeyPair | null = null;
+
+          if (storedKeyPair) {
+            try {
+              const parsed = JSON.parse(storedKeyPair);
+              afghKeyPair = {
+                ...parsed,
+                secretKey1: new Uint8Array(Object.values(parsed.secretKey1)),
+                secretKey2: new Uint8Array(Object.values(parsed.secretKey2)),
+                publicKey1: new Uint8Array(Object.values(parsed.publicKey1)),
+                publicKey2: new Uint8Array(Object.values(parsed.publicKey2)),
+              };
+              console.log("[Auth] AFGH key pair loaded from storage on init");
+            } catch (e) {
+              console.error("[Auth] Failed to parse stored key pair:", e);
+            }
+          }
+
+          setKeyPair(afghKeyPair);
           setAuthState((prev) => ({
             ...prev,
             user,

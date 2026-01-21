@@ -11,7 +11,7 @@ export interface AFGHKeyPair {
   secretKey1: Scalar;
   secretKey2: Scalar;
   publicKey1: G1Point;
-  publicKey2: G1Point;
+  publicKey2: G2Element;
   userId: string;
   createdAt: string;
   curveType: string;
@@ -19,7 +19,7 @@ export interface AFGHKeyPair {
 
 export interface AFGHPublicKey {
   publicKey1: G1Point;
-  publicKey2: G1Point;
+  publicKey2: G2Element;
   userId: string;
 }
 
@@ -39,7 +39,7 @@ export interface Level1Ciphertext {
 }
 
 export interface ReEncryptionKey {
-  key: G1Point;
+  key: G2Element;
   fromUserId: string;
   toUserId: string;
   createdAt: string;

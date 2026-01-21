@@ -1,57 +1,164 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Clock, Star, FileIcon, FolderIcon, Grid3x3, List, SlidersHorizontal } from 'lucide-react';
 import { FileTable } from '../components/files/FileTable';
 import { FileGrid } from '../components/files/FileGrid';
-import { getAllFiles, toggleFileStarred } from '../mocks';
-import { getUserByEmail } from '../mocks/teams';
+import { apiService } from '../services/apiService';
+import { afghFileService } from '../services/crypto/afghFileService';
+import { useAuth } from '../contexts/AuthContext';
+import type { EncryptedFile } from '../types';
 
 type FilterType = 'all' | 'recent' | 'starred' | 'documents' | 'images';
 type SortType = 'name' | 'date' | 'size';
 
 export const MyFilesPage: React.FC = () => {
+  const { user, keyPair } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [sortBy, setSortBy] = useState<SortType>('date');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [files, setFiles] = useState<EncryptedFile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [downloadProgress, setDownloadProgress] = useState(0);
 
-  // Get all files from mock data
-  const allFiles = getAllFiles();
+  // Fetch files from API
+  useEffect(() => {
+    loadFiles();
+  }, []);
+
+  const loadFiles = async () => {
+    try {
+      setLoading(true);
+      const userFiles = await apiService.getFiles();
+      setFiles(userFiles);
+    } catch (err) {
+      console.error('[MyFilesPage] Error loading files:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle file download with AFGH decryption
+  const handleDownload = async (file: { id: string; name: string }) => {
+    if (!user || !keyPair) {
+      alert('You must be logged in to download files');
+      return;
+    }
+
+    try {
+      setDownloadingId(file.id);
+      setDownloadProgress(0);
+      console.log('[MyFilesPage] Starting download for:', file.name);
+
+      // Step 1: Download encrypted file from backend
+      console.log('[MyFilesPage] Fetching encrypted file from server...');
+      setDownloadProgress(10);
+      const encryptedBlob = await apiService.downloadFile(file.id);
+
+      // Step 2: Read blob as text (it's a JSON envelope)
+      console.log('[MyFilesPage] Reading encrypted envelope...');
+      setDownloadProgress(20);
+      const envelopeText = await encryptedBlob.text();
+
+      // Step 3: Deserialize the AFGH envelope
+      console.log('[MyFilesPage] Deserializing envelope...');
+      const envelope = afghFileService.deserializeEnvelope(envelopeText);
+      console.log('[MyFilesPage] Envelope loaded:', envelope.fileId);
+
+      // Step 4: Decrypt the file with AFGH service
+      console.log('[MyFilesPage] Decrypting file with AFGH...');
+      const decryptedFile = await afghFileService.decryptFileOwner(
+        envelope,
+        keyPair,
+        (progress, message) => {
+          const mappedProgress = 30 + Math.round(progress * 0.6);
+          setDownloadProgress(mappedProgress);
+          console.log(`[MyFilesPage] ${message} (${progress}%)`);
+        }
+      );
+
+      console.log('[MyFilesPage] File decrypted successfully:', decryptedFile.fileName);
+      setDownloadProgress(95);
+
+      // Step 5: Create Blob and trigger download
+      const blob = new Blob([decryptedFile.data], {
+        type: decryptedFile.mimeType,
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = decryptedFile.fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setDownloadProgress(100);
+      console.log('[MyFilesPage] Download complete!');
+    } catch (err) {
+      console.error('[MyFilesPage] Download error:', err);
+      alert(`Failed to download file: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setDownloadingId(null);
+      setDownloadProgress(0);
+    }
+  };
+
+  // Handle file delete
+  const handleDelete = async (file: { id: string; name: string }) => {
+    if (!confirm(`Delete ${file.name}?`)) return;
+
+    try {
+      await apiService.deleteFile(file.id);
+      setFiles(files.filter(f => f.id !== file.id));
+    } catch (err) {
+      console.error('[MyFilesPage] Delete error:', err);
+      alert('Failed to delete file');
+    }
+  };
+
+  // Handle star toggle
+  const handleToggleStar = async (file: { id: string }) => {
+    // TODO: Implement star toggle API
+    console.log('Toggle star for:', file.id);
+  };
 
   // Filter files based on active filter
   const getFilteredFiles = () => {
-    let filtered = allFiles;
+    let filtered = files;
 
     // Apply filter
     switch (activeFilter) {
       case 'recent': {
-        // Files uploaded in the last 7 days
         const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-        filtered = allFiles.filter(
+        filtered = files.filter(
           (file) => new Date(file.uploadedAt) >= sevenDaysAgo
         );
         break;
       }
       case 'starred':
-        filtered = allFiles.filter((file) => file.starred === true);
+        filtered = files.filter((file) => file.starred === true);
         break;
       case 'documents':
-        filtered = allFiles.filter(
+        filtered = files.filter(
           (file) =>
-            file.mimeType.includes('pdf') ||
-            file.mimeType.includes('document') ||
-            file.mimeType.includes('text') ||
-            file.mimeType.includes('spreadsheet')
+            file.mimeType?.includes('pdf') ||
+            file.mimeType?.includes('document') ||
+            file.mimeType?.includes('text') ||
+            file.mimeType?.includes('spreadsheet')
         );
         break;
       case 'images':
-        filtered = allFiles.filter(
-          (file) => file.mimeType.includes('image') || file.name.endsWith('.jpg') || file.name.endsWith('.png')
+        filtered = files.filter(
+          (file) =>
+            file.mimeType?.includes('image') ||
+            file.name.endsWith('.jpg') ||
+            file.name.endsWith('.png')
         );
         break;
       default:
-        filtered = allFiles;
+        filtered = files;
     }
 
     // Apply search
@@ -83,33 +190,32 @@ export const MyFilesPage: React.FC = () => {
 
   const filteredFiles = getFilteredFiles();
 
-  const handleToggleStar = (file: { id: string }) => {
-    toggleFileStarred(file.id);
-    setRefreshKey((prev) => prev + 1); // Force re-render
-  };
-
   // Count files for each filter
   const getFilterCount = (filterType: FilterType): number => {
     switch (filterType) {
       case 'all':
+        return files.length;
       case 'recent': {
         const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-        return allFiles.filter((file) => new Date(file.uploadedAt) >= sevenDaysAgo).length;
+        return files.filter((file) => new Date(file.uploadedAt) >= sevenDaysAgo).length;
       }
       case 'starred':
-        return allFiles.filter((file) => file.starred === true).length;
+        return files.filter((file) => file.starred === true).length;
       case 'documents':
-        return allFiles.filter(
+        return files.filter(
           (file) =>
-            file.mimeType.includes('pdf') ||
-            file.mimeType.includes('document') ||
-            file.mimeType.includes('text') ||
-            file.mimeType.includes('spreadsheet')
+            file.mimeType?.includes('pdf') ||
+            file.mimeType?.includes('document') ||
+            file.mimeType?.includes('text') ||
+            file.mimeType?.includes('spreadsheet')
         ).length;
       case 'images':
-        return allFiles.filter(
-          (file) => file.mimeType.includes('image') || file.name.endsWith('.jpg') || file.name.endsWith('.png')
+        return files.filter(
+          (file) =>
+            file.mimeType?.includes('image') ||
+            file.name.endsWith('.jpg') ||
+            file.name.endsWith('.png')
         ).length;
       default:
         return 0;
@@ -123,6 +229,14 @@ export const MyFilesPage: React.FC = () => {
     { id: 'documents' as FilterType, label: 'Documents', icon: FileIcon, count: getFilterCount('documents') },
     { id: 'images' as FilterType, label: 'Images', icon: FolderIcon, count: getFilterCount('images') },
   ];
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -229,16 +343,20 @@ export const MyFilesPage: React.FC = () => {
 
         {/* Content */}
         <div className="p-6">
-          {viewMode === 'list' ? (
+          {filteredFiles.length === 0 ? (
+            <div className="text-center py-12">
+              <FileIcon className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No files found</h3>
+              <p className="text-gray-500">Upload some files to get started</p>
+            </div>
+          ) : viewMode === 'list' ? (
             <FileTable
-              key={refreshKey}
               files={filteredFiles.map(f => ({
                 id: f.id,
                 name: f.name,
                 size: f.size,
                 uploadedAt: f.uploadedAt,
-                uploadedBy: f.uploadedBy,
-                uploadedByUser: f.uploadedBy ? getUserByEmail(f.uploadedBy) : undefined,
+                uploadedBy: user?.email,
                 encrypted: true,
                 starred: f.starred,
                 mimeType: f.mimeType,
@@ -247,49 +365,36 @@ export const MyFilesPage: React.FC = () => {
               showSearch={false}
               showUploadButton={false}
               canDelete={true}
-              onDownload={(file) => {
-                console.log('Download file:', file.id);
-                alert(`Downloading ${file.name}...`);
-              }}
-              onDelete={(file) => {
-                if (confirm(`Delete ${file.name}?`)) {
-                  console.log('Delete file:', file.id);
-                }
-              }}
+              onDownload={handleDownload}
+              onDelete={handleDelete}
               onShare={(file) => {
                 console.log('Share file:', file.id);
-                alert(`Share ${file.name} with team`);
+                alert(`Share ${file.name} with team - Coming soon!`);
               }}
               onToggleStar={handleToggleStar}
+              downloadingId={downloadingId}
+              downloadProgress={downloadProgress}
             />
           ) : (
             <FileGrid
-              key={refreshKey}
               files={filteredFiles.map(f => ({
                 id: f.id,
                 name: f.name,
                 size: f.size,
                 uploadedAt: f.uploadedAt,
-                uploadedBy: f.uploadedBy,
-                uploadedByUser: f.uploadedBy ? getUserByEmail(f.uploadedBy) : undefined,
+                uploadedBy: user?.email,
                 encrypted: true,
                 starred: f.starred,
                 mimeType: f.mimeType,
               }))}
-              onDownload={(file) => {
-                console.log('Download file:', file.id);
-                alert(`Downloading ${file.name}...`);
-              }}
-              onDelete={(file) => {
-                if (confirm(`Delete ${file.name}?`)) {
-                  console.log('Delete file:', file.id);
-                }
-              }}
+              onDownload={handleDownload}
+              onDelete={handleDelete}
               onShare={(file) => {
                 console.log('Share file:', file.id);
-                alert(`Share ${file.name} with team`);
+                alert(`Share ${file.name} with team - Coming soon!`);
               }}
               onToggleStar={handleToggleStar}
+              downloadingId={downloadingId}
             />
           )}
         </div>

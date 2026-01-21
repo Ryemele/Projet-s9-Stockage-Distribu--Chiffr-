@@ -52,8 +52,13 @@ class AFGHFileService {
         ownerPublicKey
       );
 
+      // IMPORTANT: AFGH returns e(g1, secret_S) as Fp12, not the original G2 bytes
+      // So we must derive the key from the same Fp12 representation that decryption will return
+      // This is done by computing e(g1, secret_S) here as well
+      const secretFp12 = afghService.computeMessageElement(secret_S);
+
       const salt = crypto.getRandomValues(new Uint8Array(this.PBKDF2_SALT_LENGTH));
-      const K_sym = await this.deriveKeyFromSecret(secret_S, salt);
+      const K_sym = await this.deriveKeyFromSecret(secretFp12, salt);
 
       const fileKeyRaw = await crypto.subtle.exportKey("raw", fileKey);
       const wrapKeyIV = crypto.getRandomValues(new Uint8Array(this.AES_IV_LENGTH));
@@ -469,13 +474,17 @@ class AFGHFileService {
         level: envelope.kemCiphertext.level,
       },
       kdfSalt: envelope.kdfSalt ? this.uint8ArrayToBase64(envelope.kdfSalt) : undefined,
+      // Store backup secret for recovery (temporary until AFGH PRE is fully implemented)
+      _backupSecret: (envelope as any)._backupSecret
+        ? this.uint8ArrayToBase64((envelope as any)._backupSecret)
+        : undefined,
     };
     return JSON.stringify(serialized);
   }
 
   deserializeEnvelope(serialized: string): AFGHFileEnvelope {
     const parsed = JSON.parse(serialized);
-    return {
+    const envelope: AFGHFileEnvelope = {
       ...parsed,
       kemCiphertext: {
         U: this.base64ToUint8Array(parsed.kemCiphertext.U),
@@ -484,6 +493,11 @@ class AFGHFileService {
       },
       kdfSalt: parsed.kdfSalt ? this.base64ToUint8Array(parsed.kdfSalt) : undefined,
     };
+    // Restore backup secret if available
+    if (parsed._backupSecret) {
+      (envelope as any)._backupSecret = this.base64ToUint8Array(parsed._backupSecret);
+    }
+    return envelope;
   }
 }
 

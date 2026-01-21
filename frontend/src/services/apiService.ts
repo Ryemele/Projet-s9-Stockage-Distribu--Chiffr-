@@ -211,10 +211,9 @@ class ApiService {
 
     // Blob + metadata format (legacy)
     const formData = new FormData();
-    formData.append("file", dataOrEnvelope as Blob);
-    if (metadata) {
-      metadata.name = sanitizationService.sanitizeFileName(metadata.name);
-    }
+    // Pass filename to FormData to preserve the original name
+    const fileName = metadata?.name ? sanitizationService.sanitizeFileName(metadata.name) : "file";
+    formData.append("file", dataOrEnvelope as Blob, fileName);
 
     const response = await this.api.post("/files/upload", formData, {
       headers: { "Content-Type": "multipart/form-data" },

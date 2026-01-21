@@ -46,21 +46,30 @@ export const FileList: React.FC<{ key?: number }> = () => {
       setDownloadProgress(0);
       console.log("[FileList] Starting download for:", file.name);
 
-      // Récupérer l'enveloppe depuis le serveur
-      console.log("[FileList] Fetching encrypted file envelope...");
-      const encryptedDataUrl = file.encryptedDataUrl;
+      // Step 1: Download encrypted file from backend
+      console.log("[FileList] Fetching encrypted file from server...");
+      setDownloadProgress(10);
+      const encryptedBlob = await apiService.downloadFile(file.id);
 
-      // Désérialiser l'enveloppe AFGH
-      const envelope = afghFileService.deserializeEnvelope(encryptedDataUrl);
+      // Step 2: Read blob as text (it's a JSON envelope)
+      console.log("[FileList] Reading encrypted envelope...");
+      setDownloadProgress(20);
+      const envelopeText = await encryptedBlob.text();
+
+      // Step 3: Deserialize the AFGH envelope
+      console.log("[FileList] Deserializing envelope...");
+      const envelope = afghFileService.deserializeEnvelope(envelopeText);
       console.log("[FileList] Envelope loaded:", envelope.fileId);
 
-      // Déchiffrer le fichier avec le service AFGH (real encryption!)
+      // Step 4: Decrypt the file with AFGH service
       console.log("[FileList] Decrypting file with AFGH...");
       const decryptedFile = await afghFileService.decryptFileOwner(
         envelope,
         keyPair,
         (progress, message) => {
-          setDownloadProgress(progress);
+          // Map progress from 0-100 to 30-90
+          const mappedProgress = 30 + Math.round(progress * 0.6);
+          setDownloadProgress(mappedProgress);
           console.log(`[FileList] ${message} (${progress}%)`);
         }
       );
@@ -69,8 +78,9 @@ export const FileList: React.FC<{ key?: number }> = () => {
         "[FileList] File decrypted successfully:",
         decryptedFile.fileName
       );
+      setDownloadProgress(95);
 
-      // Créer un Blob et télécharger le fichier déchiffré
+      // Step 5: Create Blob and trigger download
       const blob = new Blob([decryptedFile.data], {
         type: decryptedFile.mimeType,
       });
@@ -84,6 +94,7 @@ export const FileList: React.FC<{ key?: number }> = () => {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
+      setDownloadProgress(100);
       console.log("[FileList] Download complete!");
       alert(`File "${file.name}" downloaded successfully!`);
     } catch (err) {

@@ -1,12 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /**
- * Service AFGH (Ateniese-Fu-Green-Hohenberger) Proxy Re-Encryption
- * Courbe: BLS12-381 (pairings-friendly)
+ * AFGH (Ateniese-Fu-Green-Hohenberger) Proxy Re-Encryption Service
+ *
+ * BLS12-381 based implementation for secure file sharing
+ * Properties: Unidirectional, Non-transitive, Collusion-safe
  */
 
-// @ts-expect-error - Package uses .js exports
+// @ts-expect-error - Module type declarations issue
 import { bls12_381 as bls } from "@noble/curves/bls12-381";
-// @ts-expect-error - Package uses .js exports
+// @ts-expect-error - Module type declarations issue
 import { randomBytes } from "@noble/hashes/utils";
 
 import type {
@@ -37,47 +39,11 @@ class AFGHService {
     "0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001"
   );
 
-  // Cache for API access patterns
-  private _G1Point: any = null;
-  private _G2Point: any = null;
-
-  private get G1Point() {
-    if (!this._G1Point) {
-      // Try different API access patterns for noble-curves compatibility
-      if (bls.G1?.ProjectivePoint) {
-        this._G1Point = bls.G1.ProjectivePoint;
-      } else if ((bls.G1 as any)?.Point) {
-        this._G1Point = (bls.G1 as any).Point;
-      } else {
-        this._G1Point = bls.G1;
-      }
-    }
-    return this._G1Point;
-  }
-
-  private get G2Point() {
-    if (!this._G2Point) {
-      // Try different API access patterns for noble-curves compatibility
-      if (bls.G2?.ProjectivePoint) {
-        this._G2Point = bls.G2.ProjectivePoint;
-      } else if ((bls.G2 as any)?.Point) {
-        this._G2Point = (bls.G2 as any).Point;
-      } else {
-        this._G2Point = bls.G2;
-      }
-    }
-    return this._G2Point;
-  }
-
   private _generatorG1: any = null;
   private get GENERATOR_G1() {
     if (!this._generatorG1) {
-      const G1P = this.G1Point;
-      if (G1P?.BASE) {
-        this._generatorG1 = G1P.BASE;
-      } else if (G1P?.ZERO) {
-        // Use generator from hashToCurve as fallback
-        this._generatorG1 = bls.G1.hashToCurve(new Uint8Array([0, 0, 0, 1]));
+      if (bls.G1.Point?.BASE) {
+        this._generatorG1 = bls.G1.Point.BASE;
       } else {
         this._generatorG1 = bls.G1.hashToCurve(new Uint8Array([0, 0, 0, 1]));
       }
@@ -88,11 +54,8 @@ class AFGHService {
   private _generatorG2: any = null;
   private get GENERATOR_G2() {
     if (!this._generatorG2) {
-      const G2P = this.G2Point;
-      if (G2P?.BASE) {
-        this._generatorG2 = G2P.BASE;
-      } else if (G2P?.ZERO) {
-        this._generatorG2 = bls.G2.hashToCurve(new Uint8Array([0, 0, 0, 1]));
+      if (bls.G2.Point?.BASE) {
+        this._generatorG2 = bls.G2.Point.BASE;
       } else {
         this._generatorG2 = bls.G2.hashToCurve(new Uint8Array([0, 0, 0, 1]));
       }
@@ -101,10 +64,10 @@ class AFGHService {
   }
 
   constructor() {
-    console.log("[AFGH] Initializing AFGH Service with BLS12-381");
-    // Log API availability for debugging
-    console.log("[AFGH] G1.ProjectivePoint:", !!bls.G1?.ProjectivePoint);
-    console.log("[AFGH] G2.ProjectivePoint:", !!bls.G2?.ProjectivePoint);
+    if (!bls || !bls.G1 || !bls.G2) {
+      throw new Error("BLS12-381 library not loaded");
+    }
+    console.log("[AFGH] Service initialized");
   }
 
   initialize(config?: Partial<AFGHConfig>): void {
@@ -206,19 +169,20 @@ class AFGHService {
   async decryptLevel2(
     ciphertext: Level2Ciphertext,
     secretKey2: Scalar,
-    publicKey1: G1Point
+    _publicKey1: G1Point
   ): Promise<G2Element> {
     try {
       console.log(`[AFGH] Decrypting Level 2 ciphertext`);
 
       const U = this.bytesToG1Point(ciphertext.U);
       const V = this.bytesToFp12(ciphertext.V);
-      const A1 = this.bytesToG1Point(publicKey1);
 
       const a2BigInt = this.scalarToBigInt(secretKey2);
       const U_a2 = U.multiply(a2BigInt);
 
-      const pairing = bls.pairing(U_a2, A1);
+      // Recalculate A2 from secretKey2: A2 = g2^a2
+      const A2 = this.GENERATOR_G2.multiply(a2BigInt);
+      const pairing = bls.pairing(U_a2, A2);
       const pairingInverse = bls.fields.Fp12.inv(pairing);
 
       const message = bls.fields.Fp12.mul(V, pairingInverse);
@@ -244,27 +208,25 @@ class AFGHService {
     try {
       console.log(`[AFGH] Generating re-encryption key: ${aliceUserId} → ${bobUserId}`);
 
-      const B2 = this.bytesToG1Point(bobPublicKey.publicKey2);
+      const B2 = this.bytesToG2Element(bobPublicKey.publicKey2);
       const a2BigInt = this.scalarToBigInt(aliceSecretKey2);
       const a2_inverse = bls.fields.Fr.inv(a2BigInt);
 
       const rk = B2.multiply(a2_inverse);
 
       const reEncryptionKey: ReEncryptionKey = {
-        key: this.g1PointToBytes(rk),
+        key: this.g2ElementToBytes(rk),
         fromUserId: aliceUserId,
         toUserId: bobUserId,
         createdAt: new Date().toISOString(),
-        permissions: permissions,
+        permissions,
       };
 
-      const result: ReEncryptionKeyResult = {
-        reEncryptionKey: reEncryptionKey,
-        keyBase64: this.g1PointToBase64(rk),
+      console.log(`[AFGH] Re-encryption key: ${aliceUserId} → ${bobUserId}`);
+      return {
+        reEncryptionKey,
+        keyBase64: this.uint8ArrayToBase64(reEncryptionKey.key),
       };
-
-      console.log(`[AFGH] Re-encryption key generated successfully`);
-      return result;
     } catch (error) {
       throw new AFGHError(
         `Re-encryption key generation failed: ${error}`,
@@ -283,23 +245,18 @@ class AFGHService {
       console.log(`[AFGH] Re-encrypting: ${reEncryptionKey.fromUserId} → ${reEncryptionKey.toUserId}`);
 
       const U = this.bytesToG1Point(ciphertextAlice.U);
-      const V = ciphertextAlice.V;
-      const rk = this.bytesToG1Point(reEncryptionKey.key);
+      const rk = this.bytesToG2Element(reEncryptionKey.key);
 
       const C1_prime = bls.pairing(U, rk);
-      const C2_prime = V;
 
-      const ciphertextBob: Level1Ciphertext = {
+      return {
         C1_prime: this.fp12ToBytes(C1_prime),
-        C2_prime: C2_prime,
+        C2_prime: ciphertextAlice.V,
         U: ciphertextAlice.U,
         A1: alicePublicKey.publicKey1,
         A2: alicePublicKey.publicKey2,
         level: 1,
       };
-
-      console.log(`[AFGH] Re-encryption successful`);
-      return ciphertextBob;
     } catch (error) {
       throw new AFGHError(
         `Re-encryption failed: ${error}`,
@@ -319,13 +276,13 @@ class AFGHService {
       const C1_prime = this.bytesToFp12(ciphertext.C1_prime);
       const C2_prime = this.bytesToFp12(ciphertext.C2_prime);
       const U = this.bytesToG1Point(ciphertext.U);
-      const A1 = this.bytesToG1Point(ciphertext.A1);
 
       const b2BigInt = this.scalarToBigInt(bobSecretKey2);
 
       const C1_prime_b2 = bls.fields.Fp12.pow(C1_prime, b2BigInt);
-      const pairing_U_A1 = bls.pairing(U, A1);
-      const pairing_b2 = bls.fields.Fp12.pow(pairing_U_A1, b2BigInt);
+      // Use generator G2 instead of A1 for pairing
+      const pairing_U_G2 = bls.pairing(U, this.GENERATOR_G2);
+      const pairing_b2 = bls.fields.Fp12.pow(pairing_U_G2, b2BigInt);
 
       const denominator = bls.fields.Fp12.mul(C1_prime_b2, pairing_b2);
       const denominatorInverse = bls.fields.Fp12.inv(denominator);
@@ -358,86 +315,66 @@ class AFGHService {
   }
 
   private g1PointToBytes(point: any): G1Point {
-    if (typeof point.toRawBytes === "function") {
-      return point.toRawBytes(true);
+    if (typeof point.toHex === "function") {
+      return this.hexToUint8Array(point.toHex());
     }
-    const hex = point.toHex(true);
-    return this.hexToBytes(hex);
+    if (typeof point.toRawBytes === "function") {
+      return point.toRawBytes();
+    }
+    throw new Error("Cannot serialize G1 point");
   }
 
   private bytesToG1Point(bytes: G1Point): any {
-    const hex = this.bytesToHex(bytes);
-    const G1P = this.G1Point;
-
-    // Try different API access patterns for noble-curves compatibility
-    if (G1P?.fromHex) {
-      return G1P.fromHex(hex);
-    }
-    if (bls.G1?.fromHex) {
-      return bls.G1.fromHex(hex);
-    }
-    // Fallback: use hashToCurve as approximation (not ideal but prevents crash)
-    console.warn("[AFGH] Using hashToCurve fallback for G1 point deserialization");
-    return bls.G1.hashToCurve(bytes);
+    const hexString = this.uint8ArrayToHex(bytes);
+    return bls.G1.Point.fromHex(hexString);
   }
 
   private g2ElementToBytes(element: any): G2Element {
-    if (typeof element.toRawBytes === "function") {
-      return element.toRawBytes(true);
+    if (typeof element.toHex === "function") {
+      return this.hexToUint8Array(element.toHex());
     }
-    const hex = element.toHex(true);
-    return this.hexToBytes(hex);
+    if (typeof element.toRawBytes === "function") {
+      return element.toRawBytes();
+    }
+    throw new Error("Cannot serialize G2 point");
   }
 
   private bytesToG2Element(bytes: G2Element): any {
-    const hex = this.bytesToHex(bytes);
-    const G2P = this.G2Point;
-
-    // Try different API access patterns for noble-curves compatibility
-    if (G2P?.fromHex) {
-      return G2P.fromHex(hex);
-    }
-    if (bls.G2?.fromHex) {
-      return bls.G2.fromHex(hex);
-    }
-    // Fallback: use hashToCurve as approximation (not ideal but prevents crash)
-    console.warn("[AFGH] Using hashToCurve fallback for G2 element deserialization");
-    return bls.G2.hashToCurve(bytes);
+    const hexString = this.uint8ArrayToHex(bytes);
+    return bls.G2.Point.fromHex(hexString);
   }
 
   private fp12ToBytes(element: any): Uint8Array {
+    if (typeof element.toBytes === "function") {
+      return element.toBytes();
+    }
     const c0 = element.c0;
     const c1 = element.c1;
-    const bytes = new Uint8Array(576);
-    let offset = 0;
+    const bytes: number[] = [];
 
-    for (const c of [c0, c1]) {
-      for (const cc of [c.c0, c.c1, c.c2]) {
-        for (const ccc of [cc.c0, cc.c1]) {
-          const val = ccc.value !== undefined ? ccc.value : ccc;
-          const hex = val.toString(16).padStart(96, '0');
-          const chunk = this.hexToBytes(hex);
-          bytes.set(chunk, offset);
-          offset += 48;
-        }
-      }
-    }
-    return bytes;
+    const serializeFp6 = (fp6: any) => {
+      const parts = [fp6.c0, fp6.c1, fp6.c2];
+      parts.forEach((fp2: any) => {
+        [fp2.c0, fp2.c1].forEach((fp: any) => {
+          const val = fp.value !== undefined ? fp.value : fp;
+          const hex = val.toString(16).padStart(96, "0");
+          for (let i = 0; i < hex.length; i += 2) {
+            bytes.push(parseInt(hex.substring(i, i + 2), 16));
+          }
+        });
+      });
+    };
+
+    serializeFp6(c0);
+    serializeFp6(c1);
+    return new Uint8Array(bytes);
   }
 
-  private bytesToFp12(_bytes: Uint8Array): any {
-    // TODO: Reconstruct Fp12 from bytes - simplified for now
-    // In production, properly deserialize all 12 coefficients
-    // The _bytes parameter will be used once full Fp12 deserialization is implemented
-    return bls.fields.Fp12.ONE;
+  private bytesToFp12(bytes: Uint8Array): any {
+    return bls.fields.Fp12.fromBytes(bytes);
   }
 
-  private g1PointToBase64(point: any): string {
-    const bytes = this.g1PointToBytes(point);
-    return btoa(String.fromCharCode(...bytes));
-  }
-
-  private hexToBytes(hex: string): Uint8Array {
+  private hexToUint8Array(hex: string): Uint8Array {
     const bytes = new Uint8Array(hex.length / 2);
     for (let i = 0; i < hex.length; i += 2) {
       bytes[i / 2] = parseInt(hex.substring(i, i + 2), 16);
@@ -445,10 +382,18 @@ class AFGHService {
     return bytes;
   }
 
-  private bytesToHex(bytes: Uint8Array): string {
-    return Array.from(bytes)
+  private uint8ArrayToHex(arr: Uint8Array): string {
+    return Array.from(arr)
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
+  }
+
+  private uint8ArrayToBase64(arr: Uint8Array): string {
+    return btoa(String.fromCharCode(...arr));
+  }
+
+  private g1PointToBase64(point: any): string {
+    return this.uint8ArrayToBase64(this.g1PointToBytes(point));
   }
 
   hashToG2(message: Uint8Array): G2Element {
@@ -458,7 +403,17 @@ class AFGHService {
 
   generateRandomG2Element(): G2Element {
     const randomValue = randomBytes(32);
-    return this.hashToG2(new Uint8Array(randomValue));
+    return this.hashToG2(randomValue);
+  }
+
+  /**
+   * Compute the Fp12 representation of a G2 message: e(g1, message)
+   * This is what AFGH encryption embeds and decryption returns
+   */
+  computeMessageElement(message: G2Element): Uint8Array {
+    const messagePoint = this.bytesToG2Element(message);
+    const messageElement = bls.pairing(this.GENERATOR_G1, messagePoint);
+    return this.fp12ToBytes(messageElement);
   }
 }
 
