@@ -168,8 +168,8 @@ class AFGHService {
 
   async decryptLevel2(
     ciphertext: Level2Ciphertext,
-    secretKey2: Scalar,
-    _publicKey1: G1Point
+    secretKey1: Scalar,
+    secretKey2: Scalar
   ): Promise<G2Element> {
     try {
       console.log(`[AFGH] Decrypting Level 2 ciphertext`);
@@ -177,14 +177,21 @@ class AFGHService {
       const U = this.bytesToG1Point(ciphertext.U);
       const V = this.bytesToFp12(ciphertext.V);
 
+      const a1BigInt = this.scalarToBigInt(secretKey1);
       const a2BigInt = this.scalarToBigInt(secretKey2);
-      const U_a2 = U.multiply(a2BigInt);
 
-      // Recalculate A2 from secretKey2: A2 = g2^a2
+      // Compute A2 = g2^a2
       const A2 = this.GENERATOR_G2.multiply(a2BigInt);
-      const pairing = bls.pairing(U_a2, A2);
-      const pairingInverse = bls.fields.Fp12.inv(pairing);
 
+      // Compute e(U, A2) = e(g1^k, g2^a2) = e(g1, g2)^(k*a2)
+      const pairing_U_A2 = bls.pairing(U, A2);
+
+      // Raise to power a1: e(g1, g2)^(k*a1*a2) - this matches what was used in encryption
+      const pairing_full = bls.fields.Fp12.pow(pairing_U_A2, a1BigInt);
+
+      const pairingInverse = bls.fields.Fp12.inv(pairing_full);
+
+      // M = V / e(g1, g2)^(k*a1*a2)
       const message = bls.fields.Fp12.mul(V, pairingInverse);
 
       console.log(`[AFGH] Level 2 decryption successful`);

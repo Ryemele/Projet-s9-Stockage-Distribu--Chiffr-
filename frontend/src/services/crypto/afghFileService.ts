@@ -133,8 +133,8 @@ class AFGHFileService {
 
       const secret_S = await afghService.decryptLevel2(
         envelope.kemCiphertext,
-        ownerKeyPair.secretKey2,
-        ownerKeyPair.publicKey1
+        ownerKeyPair.secretKey1,
+        ownerKeyPair.secretKey2
       );
 
       // === PHASE 2: Dériver K_sym et unwrap K_file ===
