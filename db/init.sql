@@ -17,18 +17,60 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 -- =====================
+-- TABLE FOLDERS
+-- =====================
+CREATE TABLE IF NOT EXISTS folders (
+    folder_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    owner_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    color VARCHAR(50) DEFAULT 'blue',
+    parent_folder_id UUID REFERENCES folders(folder_id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- =====================
+-- TABLE TEAMS
+-- =====================
+CREATE TABLE IF NOT EXISTS teams (
+    team_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    created_by UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT now(),
+    settings TEXT
+);
+
+-- =====================
+-- TABLE TEAM_MEMBERS
+-- =====================
+CREATE TABLE IF NOT EXISTS team_members (
+    member_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    team_id UUID NOT NULL REFERENCES teams(team_id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    role VARCHAR(50) DEFAULT 'member',
+    joined_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- =====================
 -- TABLE FILES
 -- =====================
 CREATE TABLE IF NOT EXISTS files (
     file_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     owner_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    folder_id UUID REFERENCES folders(folder_id) ON DELETE SET NULL,
+    team_id UUID REFERENCES teams(team_id) ON DELETE SET NULL,
     filename TEXT NOT NULL,
     mime_type TEXT,
     size_bytes BIGINT NOT NULL,
     total_chunks INTEGER NOT NULL DEFAULT 1,
+    is_chunked INTEGER DEFAULT 0,
+    checksum VARCHAR(64),
     encryption_key_wrapped TEXT,
     iv TEXT,
     salt TEXT,
+    starred INTEGER DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
