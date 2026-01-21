@@ -3,7 +3,8 @@ import { apiService } from "../../services/apiService";
 import { afghFileService } from "../../services/crypto/afghFileService";
 import { useAuth } from "../../contexts/AuthContext";
 import type { EncryptedFile } from "../../types";
-import { ShareWithTeamModal } from "./ShareWithTeamModal";
+import type { AFGHFileEnvelope } from "../../types/afgh";
+import { FileShareDialog } from "./FileShareDialog";
 import { FileTable } from "./FileTable";
 
 export const FileList: React.FC<{ key?: number }> = () => {
@@ -13,9 +14,9 @@ export const FileList: React.FC<{ key?: number }> = () => {
   const [error, setError] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [downloadProgress, setDownloadProgress] = useState<number>(0);
-  const [shareModalFile, setShareModalFile] = useState<EncryptedFile | null>(
-    null
-  );
+  const [shareModalFile, setShareModalFile] = useState<EncryptedFile | null>(null);
+  const [shareEnvelope, setShareEnvelope] = useState<AFGHFileEnvelope | null>(null);
+  const [loadingShareEnvelope, setLoadingShareEnvelope] = useState(false);
 
   useEffect(() => {
     loadFiles();
@@ -122,16 +123,31 @@ export const FileList: React.FC<{ key?: number }> = () => {
     }
   };
 
-  const handleShare = (file: EncryptedFile) => {
-    setShareModalFile(file);
+  const handleShare = async (file: EncryptedFile) => {
+    try {
+      setLoadingShareEnvelope(true);
+      setShareModalFile(file);
+
+      // Download and parse the envelope for sharing
+      console.log("[FileList] Loading envelope for sharing:", file.name);
+      const encryptedBlob = await apiService.downloadFile(file.id);
+      const envelopeText = await encryptedBlob.text();
+      const envelope = afghFileService.deserializeEnvelope(envelopeText);
+
+      setShareEnvelope(envelope);
+      console.log("[FileList] Envelope loaded for sharing");
+    } catch (err) {
+      console.error("[FileList] Error loading envelope for share:", err);
+      alert("Failed to prepare file for sharing. Please try again.");
+      setShareModalFile(null);
+    } finally {
+      setLoadingShareEnvelope(false);
+    }
   };
 
-  const handleShareWithTeams = (teamIds: string[]) => {
-    console.log("[FileList] Sharing file with teams:", teamIds);
-    alert(
-      `File "${shareModalFile?.name}" shared with ${teamIds.length} team(s)!`
-    );
+  const handleShareComplete = () => {
     setShareModalFile(null);
+    setShareEnvelope(null);
   };
 
   return (
@@ -158,13 +174,28 @@ export const FileList: React.FC<{ key?: number }> = () => {
         downloadProgress={downloadProgress}
       />
 
-      {/* Share with Team Modal */}
-      {shareModalFile && (
-        <ShareWithTeamModal
+      {/* Share File Dialog */}
+      {shareModalFile && shareEnvelope && (
+        <FileShareDialog
+          fileId={shareModalFile.id}
           fileName={shareModalFile.name}
-          onClose={() => setShareModalFile(null)}
-          onShare={handleShareWithTeams}
+          envelope={shareEnvelope}
+          onClose={() => {
+            setShareModalFile(null);
+            setShareEnvelope(null);
+          }}
+          onShareComplete={handleShareComplete}
         />
+      )}
+
+      {/* Loading overlay when preparing to share */}
+      {loadingShareEnvelope && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 flex items-center space-x-3">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600"></div>
+            <span className="text-gray-700">Preparing file for sharing...</span>
+          </div>
+        </div>
       )}
     </>
   );

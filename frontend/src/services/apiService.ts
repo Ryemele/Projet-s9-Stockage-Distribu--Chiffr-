@@ -41,6 +41,21 @@ export interface FileRecoveryStatus {
   can_recover: boolean;
 }
 
+// Shared file info type
+export interface SharedFileInfo {
+  fileId: string;
+  filename: string;
+  size: number;
+  mimeType: string;
+  isOwner: boolean;
+  sharedBy: string;
+  sharedByName: string;
+  shareId: string;
+  encryptedKey: string; // Re-encrypted envelope JSON
+  permissions: 'read' | 'read-write';
+  sharedAt: string;
+}
+
 class ApiService {
   private api: AxiosInstance;
 
@@ -151,9 +166,11 @@ class ApiService {
 
     // Sanitize inputs
     const sanitizedCredentials = {
-      ...credentials,
       email: sanitizationService.sanitize(credentials.email),
       name: sanitizationService.sanitize(credentials.name),
+      password: credentials.password,
+      // Convert publicKey object to JSON string for backend storage
+      public_key: credentials.publicKey ? JSON.stringify(credentials.publicKey) : undefined,
     };
 
     if (!sanitizationService.isValidEmail(sanitizedCredentials.email)) {
@@ -409,10 +426,26 @@ class ApiService {
     return response.data;
   }
 
-  async getSharedFiles(): Promise<FileShare[]> {
+  async getSharedFiles(): Promise<SharedFileInfo[]> {
     const response = await this.api.get("/files/shared");
     const shares = Array.isArray(response.data) ? response.data : (response.data.shares || []);
-    return shares;
+    return shares.map((s: any) => ({
+      fileId: s.file_id,
+      filename: s.filename,
+      size: s.size_bytes,
+      mimeType: s.mime_type,
+      isOwner: s.is_owner,
+      sharedBy: s.shared_by,
+      sharedByName: s.shared_by_name,
+      shareId: s.share_id,
+      encryptedKey: s.encrypted_key,
+      permissions: s.permissions,
+      sharedAt: s.shared_at,
+    }));
+  }
+
+  async removeShare(shareId: string): Promise<void> {
+    await this.api.delete(`/shares/${shareId}`);
   }
 
   async getUserPublicKey(email: string): Promise<string | { publicKey1: string; publicKey2: string }> {

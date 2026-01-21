@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Search, Clock, Star, FileIcon, FolderIcon, Grid3x3, List, SlidersHorizontal } from 'lucide-react';
 import { FileTable } from '../components/files/FileTable';
 import { FileGrid } from '../components/files/FileGrid';
+import { FileShareDialog } from '../components/files/FileShareDialog';
 import { apiService } from '../services/apiService';
 import { afghFileService } from '../services/crypto/afghFileService';
 import { useAuth } from '../contexts/AuthContext';
 import type { EncryptedFile } from '../types';
+import type { AFGHFileEnvelope } from '../types/afgh';
 
 type FilterType = 'all' | 'recent' | 'starred' | 'documents' | 'images';
 type SortType = 'name' | 'date' | 'size';
@@ -20,6 +22,11 @@ export const MyFilesPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [downloadProgress, setDownloadProgress] = useState(0);
+
+  // Share modal state
+  const [shareModalFile, setShareModalFile] = useState<EncryptedFile | null>(null);
+  const [shareEnvelope, setShareEnvelope] = useState<AFGHFileEnvelope | null>(null);
+  const [loadingShareEnvelope, setLoadingShareEnvelope] = useState(false);
 
   // Fetch files from API
   useEffect(() => {
@@ -121,6 +128,38 @@ export const MyFilesPage: React.FC = () => {
   const handleToggleStar = async (file: { id: string }) => {
     // TODO: Implement star toggle API
     console.log('Toggle star for:', file.id);
+  };
+
+  // Handle share - load envelope and show dialog
+  const handleShare = async (file: { id: string; name: string }) => {
+    const fullFile = files.find(f => f.id === file.id);
+    if (!fullFile) return;
+
+    try {
+      setLoadingShareEnvelope(true);
+      setShareModalFile(fullFile);
+
+      // Download and parse the envelope for sharing
+      console.log('[MyFilesPage] Loading envelope for sharing:', file.name);
+      const encryptedBlob = await apiService.downloadFile(file.id);
+      const envelopeText = await encryptedBlob.text();
+      const envelope = afghFileService.deserializeEnvelope(envelopeText);
+
+      setShareEnvelope(envelope);
+      console.log('[MyFilesPage] Envelope loaded for sharing');
+    } catch (err) {
+      console.error('[MyFilesPage] Error loading envelope for share:', err);
+      alert('Failed to prepare file for sharing. Please try again.');
+      setShareModalFile(null);
+    } finally {
+      setLoadingShareEnvelope(false);
+    }
+  };
+
+  // Handle share complete
+  const handleShareComplete = () => {
+    setShareModalFile(null);
+    setShareEnvelope(null);
   };
 
   // Filter files based on active filter
@@ -367,10 +406,7 @@ export const MyFilesPage: React.FC = () => {
               canDelete={true}
               onDownload={handleDownload}
               onDelete={handleDelete}
-              onShare={(file) => {
-                console.log('Share file:', file.id);
-                alert(`Share ${file.name} with team - Coming soon!`);
-              }}
+              onShare={handleShare}
               onToggleStar={handleToggleStar}
               downloadingId={downloadingId}
               downloadProgress={downloadProgress}
@@ -389,16 +425,37 @@ export const MyFilesPage: React.FC = () => {
               }))}
               onDownload={handleDownload}
               onDelete={handleDelete}
-              onShare={(file) => {
-                console.log('Share file:', file.id);
-                alert(`Share ${file.name} with team - Coming soon!`);
-              }}
+              onShare={handleShare}
               onToggleStar={handleToggleStar}
               downloadingId={downloadingId}
             />
           )}
         </div>
       </div>
+
+      {/* Share File Dialog */}
+      {shareModalFile && shareEnvelope && (
+        <FileShareDialog
+          fileId={shareModalFile.id}
+          fileName={shareModalFile.name}
+          envelope={shareEnvelope}
+          onClose={() => {
+            setShareModalFile(null);
+            setShareEnvelope(null);
+          }}
+          onShareComplete={handleShareComplete}
+        />
+      )}
+
+      {/* Loading overlay when preparing to share */}
+      {loadingShareEnvelope && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 flex items-center space-x-3">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600"></div>
+            <span className="text-gray-700">Preparing file for sharing...</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

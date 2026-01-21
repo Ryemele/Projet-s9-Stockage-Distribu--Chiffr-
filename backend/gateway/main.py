@@ -220,7 +220,21 @@ def list_shared(user: User = Depends(get_current_user), db: Session = Depends(ge
     for s in shares:
         f = db.query(FileModel).filter(FileModel.file_id == s.file_id).first()
         if f:
-            result.append({"file_id": str(f.file_id), "filename": f.filename, "size_bytes": f.size_bytes, "is_owner": False})
+            # Get sharer info
+            sharer = db.query(User).filter(User.user_id == s.shared_by).first()
+            result.append({
+                "file_id": str(f.file_id),
+                "filename": f.filename,
+                "size_bytes": f.size_bytes,
+                "mime_type": f.mime_type,
+                "is_owner": False,
+                "shared_by": sharer.email if sharer else None,
+                "shared_by_name": sharer.name if sharer else None,
+                "share_id": str(s.share_id),
+                "encrypted_key": s.encrypted_key,
+                "permissions": s.permissions,
+                "shared_at": s.created_at.isoformat() if s.created_at else None
+            })
     return result
 
 @app.get("/api/files/{file_id}")
@@ -278,6 +292,21 @@ def share_file(file_id: str, body: ShareRequest, user: User = Depends(get_curren
     db.add(share)
     db.commit()
     return {"message": f"Shared with {body.email}"}
+
+@app.delete("/api/shares/{share_id}")
+def remove_share(share_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Remove a share - either the recipient or the owner can remove it"""
+    share = db.query(Share).filter(Share.share_id == share_id).first()
+    if not share:
+        raise HTTPException(status_code=404, detail="Share not found")
+    # Check if user is the recipient or the owner
+    is_recipient = share.shared_with_email == user.email
+    is_owner = str(share.shared_by) == str(user.user_id)
+    if not is_recipient and not is_owner:
+        raise HTTPException(status_code=403, detail="Not authorized to remove this share")
+    db.delete(share)
+    db.commit()
+    return {"message": "Share removed"}
 
 @app.get("/api/users/{email}/public-key")
 def get_public_key(email: str, db: Session = Depends(get_db)):

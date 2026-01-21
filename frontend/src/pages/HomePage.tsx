@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Upload,
@@ -13,29 +13,54 @@ import type { EncryptedFile } from "../types";
 import { FolderCard } from "../components/folders/FolderCard";
 import { CreateFolderModal } from "../components/folders/CreateFolderModal";
 import { FileTable } from "../components/files/FileTable";
+import { FileShareDialog } from "../components/files/FileShareDialog";
+import { apiService } from "../services/apiService";
+import { afghFileService } from "../services/crypto/afghFileService";
+import { useAuth } from "../contexts/AuthContext";
+import type { AFGHFileEnvelope } from "../types/afgh";
 import {
   getRootFolders,
-  getAllFiles,
   addFolder,
-  calculateTotalStorage,
   formatSize,
-  toggleFileStarred,
-  deleteFileById,
 } from "../mocks";
 import { getUserByEmail } from "../mocks/teams";
 import { calculateStorageByCategory } from "../utils/fileCategories";
 
 export const HomePage: React.FC = () => {
   const navigate = useNavigate();
+  const { user, keyPair } = useAuth();
   const [showCreateFolderModal, setShowCreateFolderModal] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
 
-  // Use mock data from centralized location
+  // Use mock data for folders (could be migrated to API later)
   const [folders, setFolders] = useState<Folder[]>(getRootFolders());
 
+  // Real files from API
+  const [files, setFiles] = useState<EncryptedFile[]>([]);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [downloadProgress, setDownloadProgress] = useState(0);
+
+  // Share modal state
+  const [shareModalFile, setShareModalFile] = useState<EncryptedFile | null>(null);
+  const [shareEnvelope, setShareEnvelope] = useState<AFGHFileEnvelope | null>(null);
+  const [loadingShareEnvelope, setLoadingShareEnvelope] = useState(false);
+
+  // Load files from API
+  useEffect(() => {
+    loadFiles();
+  }, []);
+
+  const loadFiles = async () => {
+    try {
+      const userFiles = await apiService.getFiles();
+      setFiles(userFiles);
+    } catch (err) {
+      console.error('[HomePage] Error loading files:', err);
+    }
+  };
+
   // Get recent files (last 5 files)
-  const recentFiles: EncryptedFile[] = getAllFiles()
+  const recentFiles = files
     .sort(
       (a, b) =>
         new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
@@ -72,30 +97,98 @@ export const HomePage: React.FC = () => {
     console.log("Edit folder:", folder);
   };
 
-  const handleDeleteFile = (file: EncryptedFile) => {
-    deleteFileById(file.id);
-    setRefreshKey((prev) => prev + 1);
+  const handleDeleteFile = async (file: EncryptedFile) => {
+    if (!confirm(`Delete ${file.name}?`)) return;
+    try {
+      await apiService.deleteFile(file.id);
+      setFiles(files.filter(f => f.id !== file.id));
+    } catch (err) {
+      console.error('[HomePage] Delete error:', err);
+      alert('Failed to delete file');
+    }
   };
 
-  const handleDownloadFile = (file: EncryptedFile) => {
-    console.log("Download file:", file.id);
-    alert(`Downloading ${file.name}...`);
+  const handleDownloadFile = async (file: EncryptedFile) => {
+    if (!user || !keyPair) {
+      alert('You must be logged in to download files');
+      return;
+    }
+
+    try {
+      setDownloadingId(file.id);
+      setDownloadProgress(0);
+      console.log('[HomePage] Starting download for:', file.name);
+
+      const encryptedBlob = await apiService.downloadFile(file.id);
+      setDownloadProgress(20);
+
+      const envelopeText = await encryptedBlob.text();
+      const envelope = afghFileService.deserializeEnvelope(envelopeText);
+
+      const decryptedFile = await afghFileService.decryptFileOwner(
+        envelope,
+        keyPair,
+        (progress, message) => {
+          const mappedProgress = 30 + Math.round(progress * 0.6);
+          setDownloadProgress(mappedProgress);
+          console.log(`[HomePage] ${message} (${progress}%)`);
+        }
+      );
+
+      setDownloadProgress(95);
+
+      const blob = new Blob([decryptedFile.data], { type: decryptedFile.mimeType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = decryptedFile.fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setDownloadProgress(100);
+    } catch (err) {
+      console.error('[HomePage] Download error:', err);
+      alert(`Failed to download file: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setDownloadingId(null);
+      setDownloadProgress(0);
+    }
   };
 
-  const handleShareFile = (file: EncryptedFile) => {
-    console.log("Share file:", file.id);
-    alert(`Share ${file.name} with team`);
+  const handleShareFile = async (file: EncryptedFile) => {
+    try {
+      setLoadingShareEnvelope(true);
+      setShareModalFile(file);
+
+      const encryptedBlob = await apiService.downloadFile(file.id);
+      const envelopeText = await encryptedBlob.text();
+      const envelope = afghFileService.deserializeEnvelope(envelopeText);
+
+      setShareEnvelope(envelope);
+    } catch (err) {
+      console.error('[HomePage] Error loading envelope for share:', err);
+      alert('Failed to prepare file for sharing.');
+      setShareModalFile(null);
+    } finally {
+      setLoadingShareEnvelope(false);
+    }
   };
 
-  const handleToggleStar = (file: EncryptedFile) => {
-    toggleFileStarred(file.id);
-    setRefreshKey((prev) => prev + 1);
+  const handleShareComplete = () => {
+    setShareModalFile(null);
+    setShareEnvelope(null);
   };
 
-  // Calculate storage by category using the utility function
-  const allFiles = getAllFiles();
-  const storageByCategory = calculateStorageByCategory(allFiles);
-  const totalStorage = calculateTotalStorage();
+  const handleToggleStar = async (file: EncryptedFile) => {
+    // TODO: Implement star toggle API
+    console.log('Toggle star for:', file.id);
+  };
+
+  // Calculate storage by category using real files from API
+  const storageByCategory = calculateStorageByCategory(files);
+  const totalStorage = files.reduce((sum, f) => sum + f.size, 0);
 
   // Calculate percentages and create segments for the circle
   const segments = Object.entries(storageByCategory)
@@ -108,9 +201,8 @@ export const HomePage: React.FC = () => {
 
   // Get all unique participants from files
   const getParticipants = () => {
-    const allFiles = getAllFiles();
     const uniqueEmails = new Set(
-      allFiles.map((f) => f.uploadedBy).filter(Boolean)
+      files.map((f) => f.uploadedBy).filter(Boolean)
     );
     return Array.from(uniqueEmails).slice(0, 8); // Show max 8 participants
   };
@@ -194,7 +286,7 @@ export const HomePage: React.FC = () => {
                 <span className="text-sm text-gray-600">Files</span>
               </div>
               <span className="text-xl font-bold text-gray-900">
-                {getAllFiles().length}
+                {files.length}
               </span>
             </div>
           </div>
@@ -371,7 +463,6 @@ export const HomePage: React.FC = () => {
         </div>
 
         <FileTable
-          key={refreshKey}
           files={recentFiles.map((file) => ({
             id: file.id,
             name: file.name,
@@ -389,6 +480,8 @@ export const HomePage: React.FC = () => {
           onDownload={handleDownloadFile}
           onShare={handleShareFile}
           onToggleStar={handleToggleStar}
+          downloadingId={downloadingId}
+          downloadProgress={downloadProgress}
         />
       </div>
 
@@ -398,6 +491,30 @@ export const HomePage: React.FC = () => {
           onClose={() => setShowCreateFolderModal(false)}
           onCreate={handleCreateFolder}
         />
+      )}
+
+      {/* Share File Dialog */}
+      {shareModalFile && shareEnvelope && (
+        <FileShareDialog
+          fileId={shareModalFile.id}
+          fileName={shareModalFile.name}
+          envelope={shareEnvelope}
+          onClose={() => {
+            setShareModalFile(null);
+            setShareEnvelope(null);
+          }}
+          onShareComplete={handleShareComplete}
+        />
+      )}
+
+      {/* Loading overlay when preparing to share */}
+      {loadingShareEnvelope && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 flex items-center space-x-3">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600"></div>
+            <span className="text-gray-700">Preparing file for sharing...</span>
+          </div>
+        </div>
       )}
     </div>
   );
